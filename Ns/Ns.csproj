@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <LangVersion>8</LangVersion>
+        <Authors>riina</Authors>
+        <Description>Minimally reflecting serialiazation library</Description>
+        <Copyright>Copyright ©2020 teamRokuro</Copyright>
+        <Company>teamRokuro</Company>
+        <AssemblyVersion>1.0.0</AssemblyVersion>
+        <PackageVersion>1.0.0</PackageVersion>
+        <PackOnBuild>true</PackOnBuild>
+        <Owners>riina</Owners>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <RepositoryUrl>https://github.com/teamRokuro/Ns</RepositoryUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>NU5105</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.Buffers" Version="4.5.0"/>
+        <PackageReference Include="System.Memory" Version="4.5.3"/>
+    </ItemGroup>
+
+</Project>
