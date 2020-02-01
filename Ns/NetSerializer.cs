@@ -1,10 +1,12 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using static System.Buffers.ArrayPool<byte>;
+using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace Ns {
     /// <summary>
@@ -17,6 +19,7 @@ namespace Ns {
         static NetSerializer() {
             #region Register primitives
 
+            Converters[typeof(bool)] = ((s, o) => s.WriteU8((byte) ((bool) o ? 1 : 0)), s => s.ReadU8() != 0);
             Converters[typeof(byte)] = ((s, o) => s.WriteU8((byte) o), s => s.ReadU8());
             Converters[typeof(sbyte)] = ((s, o) => s.WriteS8((sbyte) o), s => s.ReadS8());
             Converters[typeof(ushort)] = ((s, o) => s.WriteU16((ushort) o), s => s.ReadU16());
@@ -29,6 +32,13 @@ namespace Ns {
             Converters[typeof(double)] = ((s, o) => s.WriteDouble((double) o), s => s.ReadDouble());
             Converters[typeof(decimal)] = ((s, o) => s.WriteDecimal((decimal) o), s => s.ReadDecimal());
             Converters[typeof(char)] = ((s, o) => s.WriteU16((char) o), s => (char) s.ReadU16());
+
+            Converters[typeof(bool[])] = ((s, o) => {
+                    var bA = (bool[]) o;
+                    s.WriteS32(bA.Length);
+                    s.WriteSpan<bool>(bA, bA.Length, sizeof(bool), false);
+                },
+                s => s.ReadArray<bool>(s.ReadS32(), sizeof(bool), false));
 
             Converters[typeof(byte[])] = ((s, o) => {
                     var u8A = (byte[]) o;
@@ -111,161 +121,96 @@ namespace Ns {
                 },
                 s => s.ReadArray<char>(s.ReadS32(), sizeof(char), false));
 
+            Converters[typeof(List<bool>)] = ((s, o) => {
+                    var bList = (List<bool>) o;
+                    s.WriteS32(bList.Count);
+                    foreach (var b in bList) s.WriteU8((byte) (b ? 1 : 0));
+                },
+                s => s.ReadList<bool>(s.ReadS32(), false));
+
             Converters[typeof(List<byte>)] = ((s, o) => {
                     var u8List = (List<byte>) o;
                     s.WriteS32(u8List.Count);
                     foreach (var u8 in u8List) s.WriteU8(u8);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<byte> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadU8());
-
-                    return list;
-                });
+                s => s.ReadList<byte>(s.ReadS32(), false));
 
             Converters[typeof(List<sbyte>)] = ((s, o) => {
                     var s8List = (List<sbyte>) o;
                     s.WriteS32(s8List.Count);
                     foreach (var s8 in s8List) s.WriteS8(s8);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<sbyte> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadS8());
-
-                    return list;
-                });
+                s => s.ReadList<sbyte>(s.ReadS32(), false));
 
             Converters[typeof(List<ushort>)] = ((s, o) => {
                     var u16List = (List<byte>) o;
                     s.WriteS32(u16List.Count);
                     foreach (var u16 in u16List) s.WriteU16(u16);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<ushort> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadU16());
-
-                    return list;
-                });
+                s => s.ReadList<ushort>(s.ReadS32(), true));
 
             Converters[typeof(List<short>)] = ((s, o) => {
                     var s16List = (List<short>) o;
                     s.WriteS32(s16List.Count);
                     foreach (var s16 in s16List) s.WriteS16(s16);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<short> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadS16());
-
-                    return list;
-                });
+                s => s.ReadList<short>(s.ReadS32(), true));
 
             Converters[typeof(List<uint>)] = ((s, o) => {
                     var u32List = (List<uint>) o;
                     s.WriteS32(u32List.Count);
                     foreach (var u32 in u32List) s.WriteU32(u32);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<uint> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadU32());
-
-                    return list;
-                });
+                s => s.ReadList<uint>(s.ReadS32(), true));
 
             Converters[typeof(List<int>)] = ((s, o) => {
                     var s32List = (List<int>) o;
                     s.WriteS32(s32List.Count);
                     foreach (var s32 in s32List) s.WriteS32(s32);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<int> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadS32());
-
-                    return list;
-                });
+                s => s.ReadList<int>(s.ReadS32(), true));
 
             Converters[typeof(List<ulong>)] = ((s, o) => {
                     var u64List = (List<ulong>) o;
                     s.WriteS32(u64List.Count);
                     foreach (var u64 in u64List) s.WriteU64(u64);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<ulong> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadU64());
-
-                    return list;
-                });
+                s => s.ReadList<ulong>(s.ReadS32(), true));
 
             Converters[typeof(List<long>)] = ((s, o) => {
                     var s64List = (List<long>) o;
                     s.WriteS32(s64List.Count);
                     foreach (var s64 in s64List) s.WriteS64(s64);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<long> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadS64());
-
-                    return list;
-                });
+                s => s.ReadList<long>(s.ReadS32(), true));
 
             Converters[typeof(List<float>)] = ((s, o) => {
                     var fList = (List<float>) o;
                     s.WriteS32(fList.Count);
                     foreach (var f in fList) s.WriteSingle(f);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<float> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadSingle());
-
-                    return list;
-                });
+                s => s.ReadList<float>(s.ReadS32(), false));
 
             Converters[typeof(List<double>)] = ((s, o) => {
                     var dList = (List<double>) o;
                     s.WriteS32(dList.Count);
                     foreach (var d in dList) s.WriteDouble(d);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<double> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadDouble());
-
-                    return list;
-                });
+                s => s.ReadList<double>(s.ReadS32(), false));
 
             Converters[typeof(List<decimal>)] = ((s, o) => {
                     var deList = (List<decimal>) o;
                     s.WriteS32(deList.Count);
                     foreach (var de in deList) s.WriteDecimal(de);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<decimal> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add(s.ReadDecimal());
-
-                    return list;
-                });
+                s => s.ReadList<decimal>(s.ReadS32(), false));
 
             Converters[typeof(List<char>)] = ((s, o) => {
                     var cList = (List<char>) o;
                     s.WriteS32(cList.Count);
                     foreach (var c in cList) s.WriteU16(c);
                 },
-                s => {
-                    var count = s.ReadS32();
-                    var list = new List<char> {Capacity = count};
-                    for (var i = 0; i < count; i++) list.Add((char) s.ReadU16());
-
-                    return list;
-                });
+                s => s.ReadList<char>(s.ReadS32(), false));
 
             #endregion
 
@@ -302,7 +247,7 @@ namespace Ns {
                 },
                 s => {
                     var count = s.ReadS32();
-                    var list = new List<string> {Capacity = count};
+                    var list = new List<string>(count);
                     for (var i = 0; i < count; i++) list.Add(s.ReadU8() == 0 ? null : s.ReadUtf8String());
 
                     return list;
@@ -374,7 +319,7 @@ namespace Ns {
                 foreach (var e in list) s.Serialize(e, nc, encoder);
             }, s => {
                 var count = s.ReadS32();
-                var res = new List<T> {Capacity = count};
+                var res = new List<T>(count);
                 for (var i = 0; i < count; i++) res.Add(s.Deserialize<T>(nc, decoder));
                 return res;
             });
@@ -403,11 +348,11 @@ namespace Ns {
         }
 
         /// <summary>
-        /// 
+        /// Register dictionary type
         /// </summary>
-        /// <typeparam name="TKey"></typeparam>
-        /// <typeparam name="TValue"></typeparam>
-        /// <exception cref="ApplicationException"></exception>
+        /// <typeparam name="TKey">Dictionary key type</typeparam>
+        /// <typeparam name="TValue">Dictionary value type</typeparam>
+        /// <exception cref="ApplicationException">If unregistered types are used</exception>
         public static void AddDictionary<TKey, TValue>() {
             if (!Converters.TryGetValue(typeof(TKey), out var key))
                 throw new ApplicationException(
@@ -532,16 +477,19 @@ namespace Ns {
             return (T) decoder.Invoke(this);
         }
 
-        private static readonly bool Swap = !BitConverter.IsLittleEndian;
+        private static readonly bool Swap = BitConverter.IsLittleEndian;
 
         /// <summary>
         /// Stream this instance wraps
         /// </summary>
-        public readonly Stream BaseStream;
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+        public Stream BaseStream { get; set; }
 
         private readonly byte[] _buffer = new byte[sizeof(decimal)];
-        private readonly Decoder _decoder = Encoding.UTF8.GetDecoder();
-        private readonly Encoder _encoder = Encoding.UTF8.GetEncoder();
+        private Decoder Decoder => _decoder ??= Encoding.UTF8.GetDecoder();
+        private Decoder _decoder;
+        private Encoder Encoder => _encoder ??= Encoding.UTF8.GetEncoder();
+        private Encoder _encoder;
 
         /// <summary>
         /// Create new NetSerializer instance
@@ -561,7 +509,7 @@ namespace Ns {
         /// <typeparam name="T">Type of elements</typeparam>
         /// <returns>Array</returns>
         /// <exception cref="ApplicationException">If failed to read required number of bytes</exception>
-        public T[] ReadArray<T>(int count, int order, bool enableSwap, T[] target = null) where T : struct {
+        public T[] ReadArray<T>(int count, int order, bool enableSwap, T[] target = null) where T : unmanaged {
             target ??= new T[count];
             ReadSpan<T>(target, count, order, enableSwap);
             return target;
@@ -571,16 +519,115 @@ namespace Ns {
         /// Read list
         /// </summary>
         /// <param name="count">Number of elements</param>
-        /// <param name="order">Length of each element</param>
         /// <param name="enableSwap">Enable element endianness swapping</param>
         /// <param name="target">Optional existing array to operate on</param>
         /// <typeparam name="T">Type of elements</typeparam>
         /// <returns>Array</returns>
         /// <exception cref="ApplicationException">If failed to read required number of bytes</exception>
-        public List<T> ReadList<T>(int count, int order, bool enableSwap, List<T> target = null) where T : struct {
+        public unsafe List<T> ReadList<T>(int count, bool enableSwap, List<T> target = null) where T : unmanaged {
             target ??= new List<T>();
-            target.AddRange(ReadArray<T>(count, order, enableSwap));
-            return target;
+            if (target.Capacity < count)
+                target.Capacity = count;
+            var order = sizeof(T);
+            var mainLen = count * order;
+            var buf = Shared.Rent(4096);
+            var span = buf.AsSpan();
+            try {
+                fixed (byte* p = &span.GetPinnableReference()) {
+                    int left = mainLen, read, tot = 0, curTot = 0;
+                    if (order == 1 || !enableSwap || !Swap) {
+                        do {
+                            read = BaseStream.Read(buf, curTot, Math.Min(4096 - curTot, left));
+                            curTot += read;
+                            var trunc = curTot - curTot % order;
+                            for (var i = 0; i < trunc; i += order)
+                                target.Add(*(T*) (p + i));
+                            curTot -= trunc;
+                            span.Slice(trunc, curTot).CopyTo(span);
+                            left -= read;
+                            tot += read;
+                        } while (left > 0);
+
+                        if (left > 0)
+                            throw new ApplicationException(
+                                $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left, 0x{BaseStream.Position:X} end position");
+                        return target;
+                    }
+
+                    do {
+                        read = BaseStream.Read(buf, curTot, Math.Min(4096 - curTot, left));
+                        curTot += read;
+                        var trunc = curTot - curTot % order;
+                        switch (order) {
+                            case 2:
+                                for (var i = 0; i < trunc; i += 2) {
+                                    var tmp = p[i];
+                                    p[i] = p[i + 1];
+                                    p[i + 1] = tmp;
+                                    target.Add(*(T*) (p + i));
+                                }
+
+                                break;
+                            case 4:
+                                for (var i = 0; i < trunc; i += 4) {
+                                    var tmp = p[i];
+                                    p[i] = p[i + 3];
+                                    p[i + 3] = tmp;
+                                    tmp = p[i + 1];
+                                    p[i + 1] = p[i + 2];
+                                    p[i + 2] = tmp;
+                                    target.Add(*(T*) (p + i));
+                                }
+
+                                break;
+                            case 8:
+                                for (var i = 0; i < trunc; i += 8) {
+                                    var tmp = p[i];
+                                    p[i] = p[i + 7];
+                                    p[i + 7] = tmp;
+                                    tmp = p[i + 1];
+                                    p[i + 1] = p[i + 6];
+                                    p[i + 6] = tmp;
+                                    tmp = p[i + 2];
+                                    p[i + 2] = p[i + 5];
+                                    p[i + 5] = tmp;
+                                    tmp = p[i + 3];
+                                    p[i + 3] = p[i + 4];
+                                    p[i + 4] = tmp;
+                                    target.Add(*(T*) (p + i));
+                                }
+
+                                break;
+                            default:
+                                var half = order / 2;
+                                for (var i = 0; i < trunc; i += order) {
+                                    for (var j = 0; j < half; j++) {
+                                        var tmp = p[i];
+                                        var sec = i + order - 1 - j;
+                                        p[i] = p[sec];
+                                        p[sec] = tmp;
+                                        target.Add(*(T*) (p + i));
+                                    }
+                                }
+
+                                break;
+                        }
+
+                        curTot -= trunc;
+                        span.Slice(trunc, curTot).CopyTo(span);
+                        left -= read;
+                        tot += read;
+                    } while (left > 0);
+
+                    if (left > 0)
+                        throw new ApplicationException(
+                            $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left, 0x{BaseStream.Position:X} end position");
+                    return target;
+                }
+            }
+            finally {
+                Shared.Return(buf);
+            }
         }
 
         /// <summary>
@@ -592,15 +639,15 @@ namespace Ns {
         /// <param name="enableSwap">Enable element endianness swapping</param>
         /// <typeparam name="T">Type of elements</typeparam>
         /// <exception cref="ApplicationException">If failed to read required number of bytes</exception>
-        public unsafe void ReadSpan<T>(Span<T> target, int count, int order, bool enableSwap) where T : struct {
+        public unsafe void ReadSpan<T>(Span<T> target, int count, int order, bool enableSwap) where T : unmanaged {
             var mainTarget = MemoryMarshal.Cast<T, byte>(target);
             var mainLen = count * order;
-            var buf = ArrayPool<byte>.Shared.Rent(4096);
+            var buf = Shared.Rent(4096);
             var span = buf.AsSpan();
             try {
-                int left = mainLen, read, tot = 0;
+                int left = mainLen, tot = 0;
                 do {
-                    read = BaseStream.Read(buf, 0, Math.Min(4096, left));
+                    var read = BaseStream.Read(buf, 0, Math.Min(4096, left));
                     span.Slice(0, read).CopyTo(mainTarget.Slice(tot));
                     left -= read;
                     tot += read;
@@ -608,9 +655,9 @@ namespace Ns {
 
                 if (left > 0)
                     throw new ApplicationException(
-                        $"Failed to read required number of bytes! 0x{read:X} read, 0x{left:X} left, 0x{BaseStream.Position:X} end position");
+                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left, 0x{BaseStream.Position:X} end position");
 
-                if (enableSwap && Swap) {
+                if (order != 1 && enableSwap && Swap) {
                     fixed (byte* p = &mainTarget.GetPinnableReference()) {
                         switch (order) {
                             case 2:
@@ -622,7 +669,7 @@ namespace Ns {
 
                                 break;
                             case 4:
-                                for (var i = 0; i < mainLen; i += 2) {
+                                for (var i = 0; i < mainLen; i += 4) {
                                     var tmp = p[i];
                                     p[i] = p[i + 3];
                                     p[i + 3] = tmp;
@@ -633,7 +680,7 @@ namespace Ns {
 
                                 break;
                             case 8:
-                                for (var i = 0; i < mainLen; i += 2) {
+                                for (var i = 0; i < mainLen; i += 8) {
                                     var tmp = p[i];
                                     p[i] = p[i + 7];
                                     p[i + 7] = tmp;
@@ -666,20 +713,9 @@ namespace Ns {
                 }
             }
             finally {
-                ArrayPool<byte>.Shared.Return(buf);
+                Shared.Return(buf);
             }
         }
-
-        /// <summary>
-        /// Write list
-        /// </summary>
-        /// <param name="source">Source list</param>
-        /// <param name="count">Number of elements</param>
-        /// <param name="order">Length of each element</param>
-        /// <param name="enableSwap">Enable element endianness swapping</param>
-        /// <typeparam name="T">Type of elements</typeparam>
-        public void WriteList<T>(List<T> source, int count, int order, bool enableSwap) where T : struct =>
-            WriteSpan<T>(source.ToArray(), count, order, enableSwap);
 
         /// <summary>
         /// Write span
@@ -689,14 +725,14 @@ namespace Ns {
         /// <param name="order">Length of each element</param>
         /// <param name="enableSwap">Enable element endianness swapping</param>
         /// <typeparam name="T">Type of elements</typeparam>
-        public unsafe void WriteSpan<T>(Span<T> source, int count, int order, bool enableSwap) where T : struct {
+        public unsafe void WriteSpan<T>(Span<T> source, int count, int order, bool enableSwap) where T : unmanaged {
             var mainTarget = MemoryMarshal.Cast<T, byte>(source);
-            var buf = ArrayPool<byte>.Shared.Rent(4096);
+            var buf = Shared.Rent(4096);
             var span = buf.AsSpan();
             var left = count * order;
             var tot = 0;
             try {
-                if (!enableSwap || !Swap) {
+                if (order == 1 || !enableSwap || !Swap) {
                     while (left > 0) {
                         var noSwapCur = Math.Min(left, 4096);
                         mainTarget.Slice(tot, noSwapCur).CopyTo(buf);
@@ -723,7 +759,7 @@ namespace Ns {
 
                                 break;
                             case 4:
-                                for (var i = 0; i < cur; i += 2) {
+                                for (var i = 0; i < cur; i += 4) {
                                     var tmp = p[i];
                                     p[i] = p[i + 3];
                                     p[i + 3] = tmp;
@@ -734,7 +770,7 @@ namespace Ns {
 
                                 break;
                             case 8:
-                                for (var i = 0; i < cur; i += 2) {
+                                for (var i = 0; i < cur; i += 8) {
                                     var tmp = p[i];
                                     p[i] = p[i + 7];
                                     p[i + 7] = tmp;
@@ -771,21 +807,22 @@ namespace Ns {
                 }
             }
             finally {
-                ArrayPool<byte>.Shared.Return(buf);
+                Shared.Return(buf);
             }
         }
 
-        private void ReadBase(int length) {
-            int read, tot = 0;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Span<byte> ReadBase(int length) {
+            var tot = 0;
             do {
-                read = BaseStream.Read(_buffer, tot, length);
-                length -= read;
+                var read = BaseStream.Read(_buffer, tot, length - tot);
+                if (read == 0)
+                    throw new ApplicationException(
+                        $"Failed to read required number of bytes! 0x{length:X} left, 0x{BaseStream.Position:X} end position");
                 tot += read;
-            } while (length > 0 && read != 0);
+            } while (tot < length);
 
-            if (length > 0)
-                throw new ApplicationException(
-                    $"Failed to read required number of bytes! 0x{read:X} read, 0x{length:X} left, 0x{BaseStream.Position:X} end position");
+            return _buffer;
         }
 
         /// <summary>
@@ -793,35 +830,37 @@ namespace Ns {
         /// </summary>
         /// <returns>Decoded string</returns>
         public unsafe string ReadUtf8String() {
+            Decoder.Reset();
             var b = new StringBuilder();
-            var tmpBuf = ArrayPool<byte>.Shared.Rent(4096);
-            //var tmpBufOut = ArrayPool<byte>.Shared.Rent(4096);
+            var tmpBuf = Shared.Rent(4096);
             try {
-                fixed (byte* tmpBufPtr = tmpBuf /*, tmpBufOutPtr = tmpBufOut*/) {
-                    var charPtr = (char*) (tmpBufPtr + 2048); //tmpBufOutPtr;
+                fixed (byte* tmpBufPtr = tmpBuf) {
+                    var charPtr = (char*) (tmpBufPtr + 2048);
                     int len;
                     while ((len = Read7S32(out _)) != 0) {
-                        int read;
+                        int read, tot = 0;
                         do {
-                            read = BaseStream.Read(tmpBuf, 0, Math.Min(len, /*4096*/ 2048));
+                            read = BaseStream.Read(tmpBuf, 0, Math.Min(len, 2048));
                             len -= read;
                             var cur = 0;
                             do {
-                                _decoder.Convert(tmpBufPtr + cur, read - cur, charPtr, /*4096*/ 2048 / sizeof(char),
+                                Decoder.Convert(tmpBufPtr + cur, read - cur, charPtr, 2048 / sizeof(char),
                                     false, out var numIn, out var numOut, out _);
                                 b.Append(charPtr, numOut);
                                 cur += numIn;
                             } while (cur != read);
+
+                            tot += read;
                         } while (len > 0 && read != 0);
 
                         if (len > 0)
                             throw new ApplicationException(
-                                $"Failed to read required number of bytes! 0x{read:X} read, 0x{len:X} left, 0x{BaseStream.Position:X} end position");
+                                $"Failed to read required number of bytes! 0x{tot:X} read, 0x{tot:X} left, 0x{BaseStream.Position:X} end position");
                     }
                 }
             }
             finally {
-                ArrayPool<byte>.Shared.Return(tmpBuf);
+                Shared.Return(tmpBuf);
                 //ArrayPool<byte>.Shared.Return(tmpBufOut);
             }
 
@@ -833,14 +872,15 @@ namespace Ns {
         /// </summary>
         /// <param name="value">String to write</param>
         public unsafe void WriteUtf8String(string value) {
-            var tmpBuf = ArrayPool<byte>.Shared.Rent(4096);
+            Encoder.Reset();
+            var tmpBuf = Shared.Rent(4096);
             try {
                 fixed (char* strPtr = value) {
                     fixed (byte* tmpBufPtr = tmpBuf) {
                         var vStringOfs = 0;
                         var vStringLeft = value.Length;
                         while (vStringLeft > 0) {
-                            _encoder.Convert(strPtr + vStringOfs, vStringLeft, tmpBufPtr, 4096, false,
+                            Encoder.Convert(strPtr + vStringOfs, vStringLeft, tmpBufPtr, 4096, false,
                                 out var numIn, out var numOut, out _);
                             vStringOfs += numIn;
                             vStringLeft -= numIn;
@@ -851,7 +891,7 @@ namespace Ns {
                 }
             }
             finally {
-                ArrayPool<byte>.Shared.Return(tmpBuf);
+                Shared.Return(tmpBuf);
             }
 
             Write7S32(0);
@@ -1037,32 +1077,20 @@ namespace Ns {
         /// Read signed 16-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe short ReadS16() {
-            ReadBase(sizeof(short));
-            fixed (byte* buffer = _buffer) {
-                if (!Swap) return *(short*) buffer;
-                var tmp = *buffer;
-                *buffer = buffer[1];
-                buffer[1] = tmp;
-
-                return *(short*) buffer;
-            }
-        }
+        public short ReadS16() =>
+            Swap
+                ? ReverseEndianness(
+                    MemoryMarshal.Read<short>(ReadBase(sizeof(short))))
+                : MemoryMarshal.Read<short>(ReadBase(sizeof(short)));
 
         /// <summary>
         /// Write signed 16-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteS16(short value) {
-            fixed (byte* buffer = _buffer) {
-                *(short*) buffer = value;
-                if (Swap) {
-                    var tmp = *buffer;
-                    *buffer = buffer[1];
-                    buffer[1] = tmp;
-                }
-            }
-
+        public void WriteS16(short value) {
+            if (Swap)
+                value = ReverseEndianness(value);
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(short));
         }
 
@@ -1070,32 +1098,20 @@ namespace Ns {
         /// Read unsigned 16-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe ushort ReadU16() {
-            ReadBase(sizeof(ushort));
-            fixed (byte* buffer = _buffer) {
-                if (!Swap) return *(ushort*) buffer;
-                var tmp = *buffer;
-                *buffer = buffer[1];
-                buffer[1] = tmp;
-
-                return *(ushort*) buffer;
-            }
-        }
+        public ushort ReadU16() =>
+            Swap
+                ? ReverseEndianness(
+                    MemoryMarshal.Read<ushort>(ReadBase(sizeof(ushort))))
+                : MemoryMarshal.Read<ushort>(ReadBase(sizeof(ushort)));
 
         /// <summary>
         /// Write unsigned 16-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteU16(ushort value) {
-            fixed (byte* buffer = _buffer) {
-                *(ushort*) buffer = value;
-                if (Swap) {
-                    var tmp = *buffer;
-                    *buffer = buffer[1];
-                    buffer[1] = tmp;
-                }
-            }
-
+        public void WriteU16(ushort value) {
+            if (Swap)
+                value = ReverseEndianness(value);
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(ushort));
         }
 
@@ -1103,38 +1119,20 @@ namespace Ns {
         /// Read signed 32-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe int ReadS32() {
-            ReadBase(sizeof(int));
-            fixed (byte* buffer = _buffer) {
-                if (!Swap) return *(int*) buffer;
-                var tmp = *buffer;
-                *buffer = buffer[3];
-                buffer[3] = tmp;
-                tmp = buffer[1];
-                buffer[1] = buffer[2];
-                buffer[2] = tmp;
-
-                return *(int*) buffer;
-            }
-        }
+        public int ReadS32() =>
+            Swap
+                ? ReverseEndianness(
+                    MemoryMarshal.Read<int>(ReadBase(sizeof(int))))
+                : MemoryMarshal.Read<int>(ReadBase(sizeof(int)));
 
         /// <summary>
         /// Write signed 32-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteS32(int value) {
-            fixed (byte* buffer = _buffer) {
-                *(int*) buffer = value;
-                if (Swap) {
-                    var tmp = *buffer;
-                    *buffer = buffer[3];
-                    buffer[3] = tmp;
-                    tmp = buffer[1];
-                    buffer[1] = buffer[2];
-                    buffer[2] = tmp;
-                }
-            }
-
+        public void WriteS32(int value) {
+            if (Swap)
+                value = ReverseEndianness(value);
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(int));
         }
 
@@ -1142,38 +1140,20 @@ namespace Ns {
         /// Read unsigned 32-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe uint ReadU32() {
-            ReadBase(sizeof(uint));
-            fixed (byte* buffer = _buffer) {
-                if (!Swap) return *(uint*) buffer;
-                var tmp = *buffer;
-                *buffer = buffer[3];
-                buffer[3] = tmp;
-                tmp = buffer[1];
-                buffer[1] = buffer[2];
-                buffer[2] = tmp;
-
-                return *(uint*) buffer;
-            }
-        }
+        public uint ReadU32() =>
+            Swap
+                ? ReverseEndianness(
+                    MemoryMarshal.Read<uint>(ReadBase(sizeof(uint))))
+                : MemoryMarshal.Read<uint>(ReadBase(sizeof(uint)));
 
         /// <summary>
         /// Write unsigned 32-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteU32(uint value) {
-            fixed (byte* buffer = _buffer) {
-                *(uint*) buffer = value;
-                if (Swap) {
-                    var tmp = *buffer;
-                    *buffer = buffer[3];
-                    buffer[3] = tmp;
-                    tmp = buffer[1];
-                    buffer[1] = buffer[2];
-                    buffer[2] = tmp;
-                }
-            }
-
+        public void WriteU32(uint value) {
+            if (Swap)
+                value = ReverseEndianness(value);
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(uint));
         }
 
@@ -1181,50 +1161,20 @@ namespace Ns {
         /// Read signed 64-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe long ReadS64() {
-            ReadBase(sizeof(long));
-            fixed (byte* buffer = _buffer) {
-                if (!Swap) return *(long*) buffer;
-                var tmp = *buffer;
-                *buffer = buffer[7];
-                buffer[7] = tmp;
-                tmp = buffer[1];
-                buffer[1] = buffer[6];
-                buffer[6] = tmp;
-                tmp = buffer[2];
-                buffer[2] = buffer[5];
-                buffer[5] = tmp;
-                tmp = buffer[3];
-                buffer[3] = buffer[4];
-                buffer[4] = tmp;
-
-                return *(long*) buffer;
-            }
-        }
+        public long ReadS64() =>
+            Swap
+                ? ReverseEndianness(
+                    MemoryMarshal.Read<long>(ReadBase(sizeof(long))))
+                : MemoryMarshal.Read<long>(ReadBase(sizeof(long)));
 
         /// <summary>
         /// Write signed 64-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteS64(long value) {
-            fixed (byte* buffer = _buffer) {
-                *(long*) buffer = value;
-                if (Swap) {
-                    var tmp = *buffer;
-                    *buffer = buffer[7];
-                    buffer[7] = tmp;
-                    tmp = buffer[1];
-                    buffer[1] = buffer[6];
-                    buffer[6] = tmp;
-                    tmp = buffer[2];
-                    buffer[2] = buffer[5];
-                    buffer[5] = tmp;
-                    tmp = buffer[3];
-                    buffer[3] = buffer[4];
-                    buffer[4] = tmp;
-                }
-            }
-
+        public void WriteS64(long value) {
+            if (Swap)
+                value = ReverseEndianness(value);
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(long));
         }
 
@@ -1232,50 +1182,20 @@ namespace Ns {
         /// Read unsigned 64-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe ulong ReadU64() {
-            ReadBase(sizeof(ulong));
-            fixed (byte* buffer = _buffer) {
-                if (!Swap) return *(ulong*) buffer;
-                var tmp = *buffer;
-                *buffer = buffer[7];
-                buffer[7] = tmp;
-                tmp = buffer[1];
-                buffer[1] = buffer[6];
-                buffer[6] = tmp;
-                tmp = buffer[2];
-                buffer[2] = buffer[5];
-                buffer[5] = tmp;
-                tmp = buffer[3];
-                buffer[3] = buffer[4];
-                buffer[4] = tmp;
-
-                return *(ulong*) buffer;
-            }
-        }
+        public ulong ReadU64() =>
+            Swap
+                ? ReverseEndianness(
+                    MemoryMarshal.Read<ulong>(ReadBase(sizeof(ulong))))
+                : MemoryMarshal.Read<ulong>(ReadBase(sizeof(ulong)));
 
         /// <summary>
         /// Write unsigned 64-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteU64(ulong value) {
-            fixed (byte* buffer = _buffer) {
-                *(ulong*) buffer = value;
-                if (Swap) {
-                    var tmp = *buffer;
-                    *buffer = buffer[7];
-                    buffer[7] = tmp;
-                    tmp = buffer[1];
-                    buffer[1] = buffer[6];
-                    buffer[6] = tmp;
-                    tmp = buffer[2];
-                    buffer[2] = buffer[5];
-                    buffer[5] = tmp;
-                    tmp = buffer[3];
-                    buffer[3] = buffer[4];
-                    buffer[4] = tmp;
-                }
-            }
-
+        public void WriteU64(ulong value) {
+            if (Swap)
+                value = ReverseEndianness(value);
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(ulong));
         }
 
