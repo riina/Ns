@@ -26,7 +26,7 @@ namespace NsBenches {
         [Benchmark]
         public List<byte> NonBufferedByte() {
             _ms.Position = 0;
-            return _ns.Deserialize<List<byte>>(false, s => {
+            return _ns.Deserialize(false, s => {
                 var res = new List<byte> {Capacity = C};
                 for (var i = 0; i < C; i++) res.Add(s.ReadU8());
 
@@ -37,13 +37,13 @@ namespace NsBenches {
         [Benchmark]
         public List<byte> BufferedByte() {
             _ms.Position = 0;
-            return _ns.Deserialize<List<byte>>(false, s => s.ReadList<byte>(C, true));
+            return _ns.Deserialize(false, s => s.ReadList<byte>(C, true));
         }
 
         [Benchmark]
         public List<int> NonBufferedInt() {
             _ms.Position = 0;
-            return _ns.Deserialize<List<int>>(false, s => {
+            return _ns.Deserialize(false, s => {
                 var res = new List<int> {Capacity = C};
                 for (var i = 0; i < C; i++) res.Add(s.ReadS32());
 
@@ -54,13 +54,13 @@ namespace NsBenches {
         [Benchmark]
         public List<int> BufferedInt() {
             _ms.Position = 0;
-            return _ns.Deserialize<List<int>>(false, s => s.ReadList<int>(C, true));
+            return _ns.Deserialize(false, s => s.ReadList<int>(C, true));
         }
 
         [Benchmark]
         public List<long> NonBufferedLong() {
             _ms.Position = 0;
-            return _ns.Deserialize<List<long>>(false, s => {
+            return _ns.Deserialize(false, s => {
                 var res = new List<long> {Capacity = C};
                 for (var i = 0; i < C; i++) res.Add(s.ReadS64());
 
@@ -71,7 +71,7 @@ namespace NsBenches {
         [Benchmark]
         public List<long> BufferedLong() {
             _ms.Position = 0;
-            return _ns.Deserialize<List<long>>(false, s => s.ReadList<long>(C, true));
+            return _ns.Deserialize(false, s => s.ReadList<long>(C, true));
         }
     }
 }

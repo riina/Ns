@@ -60,14 +60,14 @@ namespace Ns.Test {
             var l2 = ns.Deserialize<long>();
             var c2 = ns.Deserialize<char>();
             var arr2 = ns.Deserialize<int[]>();
-            var list2 = ns.Deserialize<List<int>>(true, s => {
+            var list2 = ns.Deserialize(true, s => {
                 var count = s.ReadS32();
                 var res = new List<int> {Capacity = count};
                 for (var i = 0; i < count; i++) res.Add(s.ReadS32());
 
                 return res;
             });
-            var listB2 = ns.Deserialize<List<int>>(true, s => s.ReadList<int>(s.ReadS32(), true));
+            var listB2 = ns.Deserialize(true, s => s.ReadList<int>(s.ReadS32(), true));
             var str2 = ns.Deserialize<string>();
             var num2 = ns.Deserialize<decimal>();
             var dict2 = ns.Deserialize<Dictionary<string, string>>();

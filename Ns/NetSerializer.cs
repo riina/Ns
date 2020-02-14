@@ -19,194 +19,167 @@ namespace Ns {
         static NetSerializer() {
             #region Register primitives
 
-            Converters[typeof(bool)] = ((s, o) => s.WriteU8((byte) ((bool) o ? 1 : 0)), s => s.ReadU8() != 0);
-            Converters[typeof(byte)] = ((s, o) => s.WriteU8((byte) o), s => s.ReadU8());
-            Converters[typeof(sbyte)] = ((s, o) => s.WriteS8((sbyte) o), s => s.ReadS8());
-            Converters[typeof(ushort)] = ((s, o) => s.WriteU16((ushort) o), s => s.ReadU16());
-            Converters[typeof(short)] = ((s, o) => s.WriteS16((short) o), s => s.ReadS16());
-            Converters[typeof(uint)] = ((s, o) => s.WriteU32((uint) o), s => s.ReadU32());
-            Converters[typeof(int)] = ((s, o) => s.WriteS32((int) o), s => s.ReadS32());
-            Converters[typeof(ulong)] = ((s, o) => s.WriteU64((ulong) o), s => s.ReadU64());
-            Converters[typeof(long)] = ((s, o) => s.WriteS64((long) o), s => s.ReadS64());
-            Converters[typeof(float)] = ((s, o) => s.WriteSingle((float) o), s => s.ReadSingle());
-            Converters[typeof(double)] = ((s, o) => s.WriteDouble((double) o), s => s.ReadDouble());
-            Converters[typeof(decimal)] = ((s, o) => s.WriteDecimal((decimal) o), s => s.ReadDecimal());
-            Converters[typeof(char)] = ((s, o) => s.WriteU16((char) o), s => (char) s.ReadU16());
+            RegisterInternal((s, o) => s.WriteU8((byte) (o ? 1 : 0)), s => s.ReadU8() != 0);
+            RegisterInternal((s, o) => s.WriteU8(o), s => s.ReadU8());
+            RegisterInternal((s, o) => s.WriteS8(o), s => s.ReadS8());
+            RegisterInternal((s, o) => s.WriteU16(o), s => s.ReadU16());
+            RegisterInternal((s, o) => s.WriteS16(o), s => s.ReadS16());
+            RegisterInternal((s, o) => s.WriteU32(o), s => s.ReadU32());
+            RegisterInternal((s, o) => s.WriteS32(o), s => s.ReadS32());
+            RegisterInternal((s, o) => s.WriteU64(o), s => s.ReadU64());
+            RegisterInternal((s, o) => s.WriteS64(o), s => s.ReadS64());
+            RegisterInternal((s, o) => s.WriteSingle(o), s => s.ReadSingle());
+            RegisterInternal((s, o) => s.WriteDouble(o), s => s.ReadDouble());
+            RegisterInternal((s, o) => s.WriteDecimal(o), s => s.ReadDecimal());
+            RegisterInternal((s, o) => s.WriteU16(o), s => (char) s.ReadU16());
 
-            Converters[typeof(bool[])] = ((s, o) => {
-                    var bA = (bool[]) o;
+            RegisterInternal((s, bA) => {
                     s.WriteS32(bA.Length);
                     s.WriteSpan<bool>(bA, bA.Length, sizeof(bool), false);
                 },
                 s => s.ReadArray<bool>(s.ReadS32(), sizeof(bool), false));
 
-            Converters[typeof(byte[])] = ((s, o) => {
-                    var u8A = (byte[]) o;
+            RegisterInternal((s, u8A) => {
                     s.WriteS32(u8A.Length);
                     s.WriteSpan<byte>(u8A, u8A.Length, sizeof(byte), false);
                 },
                 s => s.ReadArray<byte>(s.ReadS32(), sizeof(byte), false));
 
-            Converters[typeof(sbyte[])] = ((s, o) => {
-                    var s8A = (sbyte[]) o;
+            RegisterInternal((s, s8A) => {
                     s.WriteS32(s8A.Length);
                     s.WriteSpan<sbyte>(s8A, s8A.Length, sizeof(sbyte), false);
                 },
                 s => s.ReadArray<sbyte>(s.ReadS32(), sizeof(sbyte), false));
 
-            Converters[typeof(ushort[])] = ((s, o) => {
-                    var u16A = (ushort[]) o;
+            RegisterInternal((s, u16A) => {
                     s.WriteS32(u16A.Length);
                     s.WriteSpan<ushort>(u16A, u16A.Length, sizeof(ushort), true);
                 },
                 s => s.ReadArray<ushort>(s.ReadS32(), sizeof(ushort), true));
 
-            Converters[typeof(short[])] = ((s, o) => {
-                    var s16A = (short[]) o;
+            RegisterInternal((s, s16A) => {
                     s.WriteS32(s16A.Length);
                     s.WriteSpan<short>(s16A, s16A.Length, sizeof(short), true);
                 },
                 s => s.ReadArray<short>(s.ReadS32(), sizeof(short), true));
 
-            Converters[typeof(uint[])] = ((s, o) => {
-                var u32A = (uint[]) o;
+            RegisterInternal((s, u32A) => {
                 s.WriteS32(u32A.Length);
                 s.WriteSpan<uint>(u32A, u32A.Length, sizeof(uint), true);
             }, s => s.ReadArray<uint>(s.ReadS32(), sizeof(uint), true));
 
-            Converters[typeof(int[])] = ((s, o) => {
-                var s32A = (int[]) o;
+            RegisterInternal((s, s32A) => {
                 s.WriteS32(s32A.Length);
                 s.WriteSpan<int>(s32A, s32A.Length, sizeof(int), true);
             }, s => s.ReadArray<int>(s.ReadS32(), sizeof(int), true));
 
-            Converters[typeof(ulong[])] = ((s, o) => {
-                    var u64A = (ulong[]) o;
+            RegisterInternal((s, u64A) => {
                     s.WriteS32(u64A.Length);
                     s.WriteSpan<ulong>(u64A, u64A.Length, sizeof(ulong), true);
                 },
                 s => s.ReadArray<ulong>(s.ReadS32(), sizeof(ulong), true));
 
-            Converters[typeof(long[])] = ((s, o) => {
-                var s64A = (long[]) o;
+            RegisterInternal((s, s64A) => {
                 s.WriteS32(s64A.Length);
                 s.WriteSpan<long>(s64A, s64A.Length, sizeof(long), true);
             }, s => s.ReadArray<long>(s.ReadS32(), sizeof(long), true));
 
-            Converters[typeof(float[])] = ((s, o) => {
-                    var fA = (float[]) o;
+            RegisterInternal((s, fA) => {
                     s.WriteS32(fA.Length);
                     s.WriteSpan<float>(fA, fA.Length, sizeof(float), false);
                 },
                 s => s.ReadArray<float>(s.ReadS32(), sizeof(float), false));
 
-            Converters[typeof(double[])] = ((s, o) => {
-                    var dA = (double[]) o;
+            RegisterInternal((s, dA) => {
                     s.WriteS32(dA.Length);
                     s.WriteSpan<double>(dA, dA.Length, sizeof(double), false);
                 },
                 s => s.ReadArray<double>(s.ReadS32(), sizeof(double), false));
 
-            Converters[typeof(decimal[])] = ((s, o) => {
-                    var deA = (decimal[]) o;
+            RegisterInternal((s, deA) => {
                     s.WriteS32(deA.Length);
                     s.WriteSpan<decimal>(deA, deA.Length, sizeof(decimal), false);
                 },
                 s => s.ReadArray<decimal>(s.ReadS32(), sizeof(decimal), false));
 
-            Converters[typeof(char[])] = ((s, o) => {
-                    var cA = (char[]) o;
+            RegisterInternal((s, cA) => {
                     s.WriteS32(cA.Length);
                     s.WriteSpan<char>(cA, cA.Length, sizeof(char), false);
                 },
                 s => s.ReadArray<char>(s.ReadS32(), sizeof(char), false));
 
-            Converters[typeof(List<bool>)] = ((s, o) => {
-                    var bList = (List<bool>) o;
-                    s.WriteS32(bList.Count);
+            RegisterInternal((s, bList) => {
                     foreach (var b in bList) s.WriteU8((byte) (b ? 1 : 0));
                 },
                 s => s.ReadList<bool>(s.ReadS32(), false));
 
-            Converters[typeof(List<byte>)] = ((s, o) => {
-                    var u8List = (List<byte>) o;
+            RegisterInternal((s, u8List) => {
                     s.WriteS32(u8List.Count);
                     foreach (var u8 in u8List) s.WriteU8(u8);
                 },
                 s => s.ReadList<byte>(s.ReadS32(), false));
 
-            Converters[typeof(List<sbyte>)] = ((s, o) => {
-                    var s8List = (List<sbyte>) o;
+            RegisterInternal((s, s8List) => {
                     s.WriteS32(s8List.Count);
                     foreach (var s8 in s8List) s.WriteS8(s8);
                 },
                 s => s.ReadList<sbyte>(s.ReadS32(), false));
 
-            Converters[typeof(List<ushort>)] = ((s, o) => {
-                    var u16List = (List<byte>) o;
+            RegisterInternal((s, u16List) => {
                     s.WriteS32(u16List.Count);
                     foreach (var u16 in u16List) s.WriteU16(u16);
                 },
                 s => s.ReadList<ushort>(s.ReadS32(), true));
 
-            Converters[typeof(List<short>)] = ((s, o) => {
-                    var s16List = (List<short>) o;
+            RegisterInternal((s, s16List) => {
                     s.WriteS32(s16List.Count);
                     foreach (var s16 in s16List) s.WriteS16(s16);
                 },
                 s => s.ReadList<short>(s.ReadS32(), true));
 
-            Converters[typeof(List<uint>)] = ((s, o) => {
-                    var u32List = (List<uint>) o;
+            RegisterInternal((s, u32List) => {
                     s.WriteS32(u32List.Count);
                     foreach (var u32 in u32List) s.WriteU32(u32);
                 },
                 s => s.ReadList<uint>(s.ReadS32(), true));
 
-            Converters[typeof(List<int>)] = ((s, o) => {
-                    var s32List = (List<int>) o;
+            RegisterInternal((s, s32List) => {
                     s.WriteS32(s32List.Count);
                     foreach (var s32 in s32List) s.WriteS32(s32);
                 },
                 s => s.ReadList<int>(s.ReadS32(), true));
 
-            Converters[typeof(List<ulong>)] = ((s, o) => {
-                    var u64List = (List<ulong>) o;
+            RegisterInternal((s, u64List) => {
                     s.WriteS32(u64List.Count);
                     foreach (var u64 in u64List) s.WriteU64(u64);
                 },
                 s => s.ReadList<ulong>(s.ReadS32(), true));
 
-            Converters[typeof(List<long>)] = ((s, o) => {
-                    var s64List = (List<long>) o;
+            RegisterInternal((s, s64List) => {
                     s.WriteS32(s64List.Count);
                     foreach (var s64 in s64List) s.WriteS64(s64);
                 },
                 s => s.ReadList<long>(s.ReadS32(), true));
 
-            Converters[typeof(List<float>)] = ((s, o) => {
-                    var fList = (List<float>) o;
+            RegisterInternal((s, fList) => {
                     s.WriteS32(fList.Count);
                     foreach (var f in fList) s.WriteSingle(f);
                 },
                 s => s.ReadList<float>(s.ReadS32(), false));
 
-            Converters[typeof(List<double>)] = ((s, o) => {
-                    var dList = (List<double>) o;
+            RegisterInternal((s, dList) => {
                     s.WriteS32(dList.Count);
                     foreach (var d in dList) s.WriteDouble(d);
                 },
                 s => s.ReadList<double>(s.ReadS32(), false));
 
-            Converters[typeof(List<decimal>)] = ((s, o) => {
-                    var deList = (List<decimal>) o;
+            RegisterInternal((s, deList) => {
                     s.WriteS32(deList.Count);
                     foreach (var de in deList) s.WriteDecimal(de);
                 },
                 s => s.ReadList<decimal>(s.ReadS32(), false));
 
-            Converters[typeof(List<char>)] = ((s, o) => {
-                    var cList = (List<char>) o;
+            RegisterInternal((s, cList) => {
                     s.WriteS32(cList.Count);
                     foreach (var c in cList) s.WriteU16(c);
                 },
@@ -216,11 +189,10 @@ namespace Ns {
 
             #region Register strings
 
-            Converters[typeof(string)] = ((s, o) => s.WriteUtf8String((string) o),
+            RegisterInternal((s, o) => s.WriteUtf8String(o),
                 s => s.ReadUtf8String());
 
-            Converters[typeof(string[])] = ((s, o) => {
-                    var strArr = (string[]) o;
+            RegisterInternal((s, strArr) => {
                     s.WriteS32(strArr.Length);
                     foreach (var str in strArr) {
                         s.WriteU8((byte) (str != null ? 1 : 0));
@@ -236,8 +208,7 @@ namespace Ns {
                     return arr;
                 });
 
-            Converters[typeof(List<string>)] = ((s, o) => {
-                    var strList = (List<string>) o;
+            RegisterInternal((s, strList) => {
                     s.WriteS32(strList.Count);
                     foreach (var str in strList) {
                         s.WriteU8((byte) (str != null ? 1 : 0));
@@ -257,8 +228,7 @@ namespace Ns {
 
             #region Register misc collections
 
-            Converters[typeof(Dictionary<string, string>)] = ((s, o) => {
-                    var dict = (Dictionary<string, string>) o;
+            RegisterInternal((s, dict) => {
                     s.WriteS32(dict.Count);
                     foreach (var kvp in dict) {
                         var key = kvp.Key;
@@ -287,8 +257,67 @@ namespace Ns {
         }
 
         private static readonly
-            Dictionary<Type, (Action<NetSerializer, object> encoder, Func<NetSerializer, object> decoder)> Converters =
-                new Dictionary<Type, (Action<NetSerializer, object> encoder, Func<NetSerializer, object> decoder)>();
+            Dictionary<Type, (object encoder, object decoder)> Converters =
+                new Dictionary<Type, (object encoder, object decoder)>();
+
+        private static void RegisterInternal<T>(Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder)
+            => Converters[typeof(T)] = (encoder, decoder);
+
+        private static Action<NetSerializer, T[]> MakeArrayEncoder<T>(Action<NetSerializer, T> encoder, bool nc) =>
+            (s, arr) => {
+                s.WriteS32(arr.Length);
+                foreach (var e in arr) s.Serialize(e, nc, encoder);
+            };
+
+        private static Func<NetSerializer, T[]> MakeArrayDecoder<T>(Func<NetSerializer, T> decoder, bool nc) =>
+            s => {
+                var count = s.ReadS32();
+                var res = new T[count];
+                for (var i = 0; i < count; i++) res[i] = s.Deserialize(nc, decoder);
+                return res;
+            };
+
+        private static Action<NetSerializer, List<T>> MakeListEncoder<T>(Action<NetSerializer, T> encoder, bool nc) =>
+            (s, list) => {
+                s.WriteS32(list.Count);
+                foreach (var e in list) s.Serialize(e, nc, encoder);
+            };
+
+        private static Func<NetSerializer, List<T>> MakeListDecoder<T>(Func<NetSerializer, T> decoder, bool nc) =>
+            s => {
+                var count = s.ReadS32();
+                var res = new List<T>(count);
+                for (var i = 0; i < count; i++) res.Add(s.Deserialize(nc, decoder));
+                return res;
+            };
+
+        private static Action<NetSerializer, Dictionary<TKey, TValue>> MakeDictionaryEncoder<TKey, TValue>(
+            Action<NetSerializer, TKey> keyEncoder, bool keyNc, Action<NetSerializer, TValue> valueEncoder,
+            bool valueNc) =>
+            (s, dict) => {
+                s.WriteS32(dict.Count);
+                foreach (var kvp in dict) {
+                    s.Serialize(kvp.Key, keyNc, keyEncoder);
+                    s.Serialize(kvp.Value, valueNc, valueEncoder);
+                }
+            };
+
+        private static Func<NetSerializer, Dictionary<TKey, TValue>> MakeDictionaryDecoder<TKey, TValue>(
+            Func<NetSerializer, TKey> keyDecoder, bool keyNc, Func<NetSerializer, TValue> valueDecoder, bool valueNc)
+            => s => {
+                var dict = new Dictionary<TKey, TValue>();
+                var count = s.ReadS32();
+                for (var i = 0; i < count; i++) {
+                    var k = s.Deserialize(keyNc, keyDecoder);
+                    var v = s.Deserialize(valueNc, valueDecoder);
+                    if (k != null) dict[k] = v;
+                }
+
+                return dict;
+            };
+
+        private static void StrEncoder(NetSerializer s, string str) => s.WriteUtf8String(str);
+        private static string StrDecoder(NetSerializer s) => s.ReadUtf8String();
 
         /// <summary>
         /// Register a type's encoder and decoder
@@ -296,55 +325,16 @@ namespace Ns {
         /// <param name="encoder">Encoder for object to stream</param>
         /// <param name="decoder">Decoder for stream to object</param>
         /// <param name="generateCollectionConverters">Generate converters for basic collections</param>
-        public static void Register<T>(Action<NetSerializer, object> encoder, Func<NetSerializer, object> decoder,
+        public static void Register<T>(Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder,
             bool generateCollectionConverters = true) {
             var type = typeof(T);
-            Converters[type] = (encoder, decoder);
+            RegisterInternal(encoder, decoder);
             if (!generateCollectionConverters) return;
             var nc = !type.IsValueType;
-            Converters[typeof(T[])] = ((s, o) => {
-                var arr = (T[]) o;
-                s.WriteS32(arr.Length);
-                foreach (var e in arr) s.Serialize(e, nc, encoder);
-            }, s => {
-                var count = s.ReadS32();
-                var res = new T[count];
-                for (var i = 0; i < count; i++) res[i] = s.Deserialize<T>(nc, decoder);
-
-                return res;
-            });
-            Converters[typeof(List<T>)] = ((s, o) => {
-                var list = (List<T>) o;
-                s.WriteS32(list.Count);
-                foreach (var e in list) s.Serialize(e, nc, encoder);
-            }, s => {
-                var count = s.ReadS32();
-                var res = new List<T>(count);
-                for (var i = 0; i < count; i++) res.Add(s.Deserialize<T>(nc, decoder));
-                return res;
-            });
-            Converters[typeof(Dictionary<string, T>)] = ((s, o) => {
-                    var dict = (Dictionary<string, T>) o;
-                    s.WriteS32(dict.Count);
-                    foreach (var kvp in dict) {
-                        var key = kvp.Key;
-                        s.WriteU8((byte) (key != null ? 1 : 0));
-                        if (key != null)
-                            s.WriteUtf8String(key);
-                        s.Serialize(kvp.Value, nc, encoder);
-                    }
-                },
-                s => {
-                    var dict = new Dictionary<string, T>();
-                    var count = s.ReadS32();
-                    for (var i = 0; i < count; i++) {
-                        var k = s.ReadU8() == 0 ? null : s.ReadUtf8String();
-                        var v = s.Deserialize<T>(nc, decoder);
-                        if (k != null) dict[k] = v;
-                    }
-
-                    return dict;
-                });
+            RegisterInternal(MakeArrayEncoder(encoder, nc), MakeArrayDecoder(decoder, nc));
+            RegisterInternal(MakeListEncoder(encoder, nc), MakeListDecoder(decoder, nc));
+            RegisterInternal(MakeDictionaryEncoder<string, T>(StrEncoder, true, encoder, nc),
+                MakeDictionaryDecoder(StrDecoder, true, decoder, nc));
         }
 
         /// <summary>
@@ -360,31 +350,14 @@ namespace Ns {
             if (!Converters.TryGetValue(typeof(TValue), out var value))
                 throw new ApplicationException(
                     "Cannot add dictionary converters if dictionary value type is not already registered");
-            var keyE = key.encoder;
-            var keyD = key.decoder;
-            var valueE = value.encoder;
-            var valueD = value.decoder;
+            var keyE = (Action<NetSerializer, TKey>) key.encoder;
+            var keyD = (Func<NetSerializer, TKey>) key.decoder;
+            var valueE = (Action<NetSerializer, TValue>) value.encoder;
+            var valueD = (Func<NetSerializer, TValue>) value.decoder;
             var ncKey = !typeof(TKey).IsValueType;
             var ncValue = !typeof(TValue).IsValueType;
-            Converters[typeof(Dictionary<TKey, TValue>)] = ((s, o) => {
-                    var dict = (Dictionary<TKey, TValue>) o;
-                    s.WriteS32(dict.Count);
-                    foreach (var kvp in dict) {
-                        s.Serialize(kvp.Key, ncKey, keyE);
-                        s.Serialize(kvp.Value, ncValue, valueE);
-                    }
-                },
-                s => {
-                    var dict = new Dictionary<TKey, TValue>();
-                    var count = s.ReadS32();
-                    for (var i = 0; i < count; i++) {
-                        var k = s.Deserialize<TKey>(ncKey, keyD);
-                        var v = s.Deserialize<TValue>(ncValue, valueD);
-                        dict[k] = v;
-                    }
-
-                    return dict;
-                });
+            RegisterInternal(MakeDictionaryEncoder(keyE, ncKey, valueE, ncValue),
+                MakeDictionaryDecoder(keyD, ncKey, valueD, ncValue));
         }
 
         /// <summary>
@@ -394,8 +367,11 @@ namespace Ns {
         /// <typeparam name="T">Type to retrieve encoder/decoder for</typeparam>
         /// <returns>True if encoder/decoder were obtained</returns>
         public static bool GetConverter<T>(
-            out (Action<NetSerializer, object> encoder, Func<NetSerializer, object> decoder) res)
-            => Converters.TryGetValue(typeof(T), out res);
+            out (Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) res) {
+            var ret = Converters.TryGetValue(typeof(T), out var tmp);
+            res = ((Action<NetSerializer, T>) tmp.encoder, (Func<NetSerializer, T>) tmp.decoder);
+            return ret;
+        }
 
         /// <summary>
         /// Serialize an object
@@ -407,7 +383,7 @@ namespace Ns {
             var type = typeof(T);
             if (!Converters.TryGetValue(type, out var res))
                 throw new ApplicationException("Tried to serialize unregistered type");
-            Serialize(obj, !type.IsValueType, res.encoder);
+            Serialize(obj, !type.IsValueType, (Action<NetSerializer, T>) res.encoder);
         }
 
         /// <summary>
@@ -420,7 +396,7 @@ namespace Ns {
         public void Serialize<T>(T obj, bool nullCheck) {
             if (!Converters.TryGetValue(typeof(T), out var res))
                 throw new ApplicationException("Tried to serialize unregistered type");
-            Serialize(obj, nullCheck, res.encoder);
+            Serialize(obj, nullCheck, (Action<NetSerializer, T>) res.encoder);
         }
 
         /// <summary>
@@ -431,7 +407,7 @@ namespace Ns {
         /// <param name="encoder">Encoder to use</param>
         /// <typeparam name="T">Type of object to be serialized</typeparam>
         /// <exception cref="ApplicationException">If attempting to serialize unregistered type</exception>
-        public void Serialize<T>(T obj, bool nullCheck, Action<NetSerializer, object> encoder) {
+        public void Serialize<T>(T obj, bool nullCheck, Action<NetSerializer, T> encoder) {
             if (nullCheck) {
                 WriteU8((byte) (obj != null ? 1 : 0));
                 if (obj == null) return;
@@ -450,7 +426,7 @@ namespace Ns {
             var type = typeof(T);
             if (!Converters.TryGetValue(type, out var res))
                 throw new ApplicationException("Tried to deserialize unregistered type");
-            return Deserialize<T>(!type.IsValueType, res.decoder);
+            return Deserialize(!type.IsValueType, (Func<NetSerializer, T>) res.decoder);
         }
 
         /// <summary>
@@ -462,7 +438,7 @@ namespace Ns {
         public T Deserialize<T>(bool nullCheck) {
             if (!Converters.TryGetValue(typeof(T), out var res))
                 throw new ApplicationException("Tried to deserialize unregistered type");
-            return Deserialize<T>(nullCheck, res.decoder);
+            return Deserialize(nullCheck, (Func<NetSerializer, T>) res.decoder);
         }
 
         /// <summary>
@@ -472,9 +448,9 @@ namespace Ns {
         /// <param name="decoder">Decoder to use</param>
         /// <typeparam name="T">Type of object to be deserialized</typeparam>
         /// <returns>Deserialized object or null</returns>
-        public T Deserialize<T>(bool nullCheck, Func<NetSerializer, object> decoder) {
+        public T Deserialize<T>(bool nullCheck, Func<NetSerializer, T> decoder) {
             if (nullCheck && ReadU8() == 0) return default;
-            return (T) decoder.Invoke(this);
+            return decoder.Invoke(this);
         }
 
         private static readonly bool Swap = BitConverter.IsLittleEndian;
