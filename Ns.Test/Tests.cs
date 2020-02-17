@@ -44,6 +44,7 @@ namespace Ns.Test {
                 "of",
                 "hoopla"
             };
+            var guid = Guid.NewGuid();
             var ms = new MemoryStream();
             var ns = new NetSerializer(ms);
             ns.Serialize(l);
@@ -56,6 +57,7 @@ namespace Ns.Test {
             ns.Serialize(dict);
             ns.Serialize(strArr);
             ns.Serialize(strLong);
+            ns.Serialize(guid);
             ms.Position = 0;
             var l2 = ns.Deserialize<long>();
             var c2 = ns.Deserialize<char>();
@@ -73,6 +75,7 @@ namespace Ns.Test {
             var dict2 = ns.Deserialize<Dictionary<string, string>>();
             var strArr2 = ns.Deserialize<string[]>();
             var strLong2 = ns.Deserialize<string>();
+            var guid2 = ns.Deserialize<Guid>();
             Assert.AreEqual(l, l2);
             Assert.AreEqual(c, c2);
             Assert.AreEqual(arr, arr2);
@@ -83,6 +86,7 @@ namespace Ns.Test {
             CollectionAssert.AreEquivalent(dict, dict2);
             Assert.AreEqual(strArr, strArr2);
             Assert.AreEqual(strLong, strLong2);
+            Assert.AreEqual(guid, guid2);
         }
     }
 }

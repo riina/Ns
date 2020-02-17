@@ -16,8 +16,18 @@ namespace Ns {
     [SuppressMessage("ReSharper", "UnusedMember.Global")]
     [SuppressMessage("ReSharper", "UnusedMethodReturnValue.Global")]
     public class NetSerializer {
+        [SuppressMessage("ReSharper", "StaticMemberInGenericType")]
+        private static class TypeConverter<T> {
+            static TypeConverter() => RuntimeHelpers.RunClassConstructor(typeof(T).TypeHandle);
+
+            public static (Action<NetSerializer, T>encoder, Func<NetSerializer, T> decoder) Converter;
+            public static bool Init;
+        }
+
         static NetSerializer() {
             #region Register primitives
+
+            #region Base primitives
 
             RegisterInternal((s, o) => s.WriteU8((byte) (o ? 1 : 0)), s => s.ReadU8() != 0);
             RegisterInternal((s, o) => s.WriteU8(o), s => s.ReadU8());
@@ -32,81 +42,96 @@ namespace Ns {
             RegisterInternal((s, o) => s.WriteDouble(o), s => s.ReadDouble());
             RegisterInternal((s, o) => s.WriteDecimal(o), s => s.ReadDecimal());
             RegisterInternal((s, o) => s.WriteU16(o), s => (char) s.ReadU16());
+            RegisterInternal((s, o) => s.WriteGuid(o), s => s.ReadGuid());
+
+            #endregion
+
+            #region Arrays
 
             RegisterInternal((s, bA) => {
                     s.WriteS32(bA.Length);
-                    s.WriteSpan<bool>(bA, bA.Length, sizeof(bool), false);
+                    s.WriteSpan<bool>(bA, bA.Length, false);
                 },
-                s => s.ReadArray<bool>(s.ReadS32(), sizeof(bool), false));
+                s => s.ReadArray<bool>(s.ReadS32(), false));
 
             RegisterInternal((s, u8A) => {
                     s.WriteS32(u8A.Length);
-                    s.WriteSpan<byte>(u8A, u8A.Length, sizeof(byte), false);
+                    s.WriteSpan<byte>(u8A, u8A.Length, false);
                 },
-                s => s.ReadArray<byte>(s.ReadS32(), sizeof(byte), false));
+                s => s.ReadArray<byte>(s.ReadS32(), false));
 
             RegisterInternal((s, s8A) => {
                     s.WriteS32(s8A.Length);
-                    s.WriteSpan<sbyte>(s8A, s8A.Length, sizeof(sbyte), false);
+                    s.WriteSpan<sbyte>(s8A, s8A.Length, false);
                 },
-                s => s.ReadArray<sbyte>(s.ReadS32(), sizeof(sbyte), false));
+                s => s.ReadArray<sbyte>(s.ReadS32(), false));
 
             RegisterInternal((s, u16A) => {
                     s.WriteS32(u16A.Length);
-                    s.WriteSpan<ushort>(u16A, u16A.Length, sizeof(ushort), true);
+                    s.WriteSpan<ushort>(u16A, u16A.Length, true);
                 },
-                s => s.ReadArray<ushort>(s.ReadS32(), sizeof(ushort), true));
+                s => s.ReadArray<ushort>(s.ReadS32(), true));
 
             RegisterInternal((s, s16A) => {
                     s.WriteS32(s16A.Length);
-                    s.WriteSpan<short>(s16A, s16A.Length, sizeof(short), true);
+                    s.WriteSpan<short>(s16A, s16A.Length, true);
                 },
-                s => s.ReadArray<short>(s.ReadS32(), sizeof(short), true));
+                s => s.ReadArray<short>(s.ReadS32(), true));
 
             RegisterInternal((s, u32A) => {
                 s.WriteS32(u32A.Length);
-                s.WriteSpan<uint>(u32A, u32A.Length, sizeof(uint), true);
-            }, s => s.ReadArray<uint>(s.ReadS32(), sizeof(uint), true));
+                s.WriteSpan<uint>(u32A, u32A.Length, true);
+            }, s => s.ReadArray<uint>(s.ReadS32(), true));
 
             RegisterInternal((s, s32A) => {
                 s.WriteS32(s32A.Length);
-                s.WriteSpan<int>(s32A, s32A.Length, sizeof(int), true);
-            }, s => s.ReadArray<int>(s.ReadS32(), sizeof(int), true));
+                s.WriteSpan<int>(s32A, s32A.Length, true);
+            }, s => s.ReadArray<int>(s.ReadS32(), true));
 
             RegisterInternal((s, u64A) => {
                     s.WriteS32(u64A.Length);
-                    s.WriteSpan<ulong>(u64A, u64A.Length, sizeof(ulong), true);
+                    s.WriteSpan<ulong>(u64A, u64A.Length, true);
                 },
-                s => s.ReadArray<ulong>(s.ReadS32(), sizeof(ulong), true));
+                s => s.ReadArray<ulong>(s.ReadS32(), true));
 
             RegisterInternal((s, s64A) => {
                 s.WriteS32(s64A.Length);
-                s.WriteSpan<long>(s64A, s64A.Length, sizeof(long), true);
-            }, s => s.ReadArray<long>(s.ReadS32(), sizeof(long), true));
+                s.WriteSpan<long>(s64A, s64A.Length, true);
+            }, s => s.ReadArray<long>(s.ReadS32(), true));
 
             RegisterInternal((s, fA) => {
                     s.WriteS32(fA.Length);
-                    s.WriteSpan<float>(fA, fA.Length, sizeof(float), false);
+                    s.WriteSpan<float>(fA, fA.Length, false);
                 },
-                s => s.ReadArray<float>(s.ReadS32(), sizeof(float), false));
+                s => s.ReadArray<float>(s.ReadS32(), false));
 
             RegisterInternal((s, dA) => {
                     s.WriteS32(dA.Length);
-                    s.WriteSpan<double>(dA, dA.Length, sizeof(double), false);
+                    s.WriteSpan<double>(dA, dA.Length, false);
                 },
-                s => s.ReadArray<double>(s.ReadS32(), sizeof(double), false));
+                s => s.ReadArray<double>(s.ReadS32(), false));
 
             RegisterInternal((s, deA) => {
                     s.WriteS32(deA.Length);
-                    s.WriteSpan<decimal>(deA, deA.Length, sizeof(decimal), false);
+                    s.WriteSpan<decimal>(deA, deA.Length, false);
                 },
-                s => s.ReadArray<decimal>(s.ReadS32(), sizeof(decimal), false));
+                s => s.ReadArray<decimal>(s.ReadS32(), false));
 
             RegisterInternal((s, cA) => {
                     s.WriteS32(cA.Length);
-                    s.WriteSpan<char>(cA, cA.Length, sizeof(char), false);
+                    s.WriteSpan<char>(cA, cA.Length, false);
                 },
-                s => s.ReadArray<char>(s.ReadS32(), sizeof(char), false));
+                s => s.ReadArray<char>(s.ReadS32(), false));
+
+            RegisterInternal((s, guA) => {
+                    s.WriteS32(guA.Length);
+                    s.WriteSpan<Guid>(guA, guA.Length, false);
+                },
+                s => s.ReadArray<Guid>(s.ReadS32(), false));
+
+            #endregion
+
+            #region Lists
 
             RegisterInternal((s, bList) => {
                     foreach (var b in bList) s.WriteU8((byte) (b ? 1 : 0));
@@ -185,6 +210,14 @@ namespace Ns {
                 },
                 s => s.ReadList<char>(s.ReadS32(), false));
 
+            RegisterInternal((s, guList) => {
+                    s.WriteS32(guList.Count);
+                    foreach (var gu in guList) s.WriteGuid(gu);
+                },
+                s => s.ReadList<Guid>(s.ReadS32(), false));
+
+            #endregion
+
             #endregion
 
             #region Register strings
@@ -228,40 +261,28 @@ namespace Ns {
 
             #region Register misc collections
 
-            RegisterInternal((s, dict) => {
-                    s.WriteS32(dict.Count);
-                    foreach (var kvp in dict) {
-                        var key = kvp.Key;
-                        var value = kvp.Value;
-                        s.WriteU8((byte) (key != null ? 1 : 0));
-                        if (key != null)
-                            s.WriteUtf8String(key);
-                        s.WriteU8((byte) (value != null ? 1 : 0));
-                        if (value != null)
-                            s.WriteUtf8String(value);
-                    }
-                },
-                s => {
-                    var dict = new Dictionary<string, string>();
-                    var count = s.ReadS32();
-                    for (var i = 0; i < count; i++) {
-                        var k = s.ReadU8() == 0 ? null : s.ReadUtf8String();
-                        var v = s.ReadU8() == 0 ? null : s.ReadUtf8String();
-                        if (k != null) dict[k] = v;
-                    }
-
-                    return dict;
-                });
+            AddDictionary<string, string>();
+            AddDictionary<string, byte>();
+            AddDictionary<string, sbyte>();
+            AddDictionary<string, ushort>();
+            AddDictionary<string, short>();
+            AddDictionary<string, uint>();
+            AddDictionary<string, int>();
+            AddDictionary<string, ulong>();
+            AddDictionary<string, long>();
+            AddDictionary<string, float>();
+            AddDictionary<string, double>();
+            AddDictionary<string, decimal>();
+            AddDictionary<string, char>();
+            AddDictionary<string, Guid>();
 
             #endregion
         }
 
-        private static readonly
-            Dictionary<Type, (object encoder, object decoder)> Converters =
-                new Dictionary<Type, (object encoder, object decoder)>();
-
-        private static void RegisterInternal<T>(Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder)
-            => Converters[typeof(T)] = (encoder, decoder);
+        private static void RegisterInternal<T>(Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) {
+            TypeConverter<T>.Converter = (encoder, decoder);
+            TypeConverter<T>.Init = true;
+        }
 
         private static Action<NetSerializer, T[]> MakeArrayEncoder<T>(Action<NetSerializer, T> encoder, bool nc) =>
             (s, arr) => {
@@ -327,10 +348,9 @@ namespace Ns {
         /// <param name="generateCollectionConverters">Generate converters for basic collections</param>
         public static void Register<T>(Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder,
             bool generateCollectionConverters = true) {
-            var type = typeof(T);
             RegisterInternal(encoder, decoder);
             if (!generateCollectionConverters) return;
-            var nc = !type.IsValueType;
+            var nc = !typeof(T).IsValueType;
             RegisterInternal(MakeArrayEncoder(encoder, nc), MakeArrayDecoder(decoder, nc));
             RegisterInternal(MakeListEncoder(encoder, nc), MakeListDecoder(decoder, nc));
             RegisterInternal(MakeDictionaryEncoder<string, T>(StrEncoder, true, encoder, nc),
@@ -344,16 +364,14 @@ namespace Ns {
         /// <typeparam name="TValue">Dictionary value type</typeparam>
         /// <exception cref="ApplicationException">If unregistered types are used</exception>
         public static void AddDictionary<TKey, TValue>() {
-            if (!Converters.TryGetValue(typeof(TKey), out var key))
+            if (!TypeConverter<TKey>.Init)
                 throw new ApplicationException(
                     "Cannot add dictionary converters if dictionary key type is not already registered");
-            if (!Converters.TryGetValue(typeof(TValue), out var value))
+            if (!TypeConverter<TValue>.Init)
                 throw new ApplicationException(
                     "Cannot add dictionary converters if dictionary value type is not already registered");
-            var keyE = (Action<NetSerializer, TKey>) key.encoder;
-            var keyD = (Func<NetSerializer, TKey>) key.decoder;
-            var valueE = (Action<NetSerializer, TValue>) value.encoder;
-            var valueD = (Func<NetSerializer, TValue>) value.decoder;
+            var (keyE, keyD) = TypeConverter<TKey>.Converter;
+            var (valueE, valueD) = TypeConverter<TValue>.Converter;
             var ncKey = !typeof(TKey).IsValueType;
             var ncValue = !typeof(TValue).IsValueType;
             RegisterInternal(MakeDictionaryEncoder(keyE, ncKey, valueE, ncValue),
@@ -368,9 +386,8 @@ namespace Ns {
         /// <returns>True if encoder/decoder were obtained</returns>
         public static bool GetConverter<T>(
             out (Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) res) {
-            var ret = Converters.TryGetValue(typeof(T), out var tmp);
-            res = ((Action<NetSerializer, T>) tmp.encoder, (Func<NetSerializer, T>) tmp.decoder);
-            return ret;
+            res = TypeConverter<T>.Converter;
+            return TypeConverter<T>.Init;
         }
 
         /// <summary>
@@ -380,10 +397,9 @@ namespace Ns {
         /// <typeparam name="T">Type of object to be serialized</typeparam>
         /// <exception cref="ApplicationException">If attempting to serialize unregistered type</exception>
         public void Serialize<T>(T obj) {
-            var type = typeof(T);
-            if (!Converters.TryGetValue(type, out var res))
+            if (!TypeConverter<T>.Init)
                 throw new ApplicationException("Tried to serialize unregistered type");
-            Serialize(obj, !type.IsValueType, (Action<NetSerializer, T>) res.encoder);
+            Serialize(obj, !typeof(T).IsValueType, TypeConverter<T>.Converter.encoder);
         }
 
         /// <summary>
@@ -394,9 +410,9 @@ namespace Ns {
         /// <typeparam name="T">Type of object to be serialized</typeparam>
         /// <exception cref="ApplicationException">If attempting to serialize unregistered type</exception>
         public void Serialize<T>(T obj, bool nullCheck) {
-            if (!Converters.TryGetValue(typeof(T), out var res))
+            if (!TypeConverter<T>.Init)
                 throw new ApplicationException("Tried to serialize unregistered type");
-            Serialize(obj, nullCheck, (Action<NetSerializer, T>) res.encoder);
+            Serialize(obj, nullCheck, TypeConverter<T>.Converter.encoder);
         }
 
         /// <summary>
@@ -423,10 +439,9 @@ namespace Ns {
         /// <exception cref="ApplicationException">If attempting to serialize unregistered type</exception>
         /// <returns>Deserialized object or null</returns>
         public T Deserialize<T>() {
-            var type = typeof(T);
-            if (!Converters.TryGetValue(type, out var res))
+            if (!TypeConverter<T>.Init)
                 throw new ApplicationException("Tried to deserialize unregistered type");
-            return Deserialize(!type.IsValueType, (Func<NetSerializer, T>) res.decoder);
+            return Deserialize(!typeof(T).IsValueType, TypeConverter<T>.Converter.decoder);
         }
 
         /// <summary>
@@ -436,9 +451,9 @@ namespace Ns {
         /// <typeparam name="T">Type of object to be deserialized</typeparam>
         /// <returns>Deserialized object or null</returns>
         public T Deserialize<T>(bool nullCheck) {
-            if (!Converters.TryGetValue(typeof(T), out var res))
+            if (!TypeConverter<T>.Init)
                 throw new ApplicationException("Tried to deserialize unregistered type");
-            return Deserialize(nullCheck, (Func<NetSerializer, T>) res.decoder);
+            return Deserialize(nullCheck, TypeConverter<T>.Converter.decoder);
         }
 
         /// <summary>
@@ -471,23 +486,20 @@ namespace Ns {
         /// Create new NetSerializer instance
         /// </summary>
         /// <param name="baseStream">Stream to wrap</param>
-        public NetSerializer(Stream baseStream) {
-            BaseStream = baseStream;
-        }
+        public NetSerializer(Stream baseStream) => BaseStream = baseStream;
 
         /// <summary>
         /// Read array
         /// </summary>
         /// <param name="count">Number of elements</param>
-        /// <param name="order">Length of each element</param>
         /// <param name="enableSwap">Enable element endianness swapping</param>
         /// <param name="target">Optional existing array to operate on</param>
         /// <typeparam name="T">Type of elements</typeparam>
         /// <returns>Array</returns>
         /// <exception cref="ApplicationException">If failed to read required number of bytes</exception>
-        public T[] ReadArray<T>(int count, int order, bool enableSwap, T[] target = null) where T : unmanaged {
+        public T[] ReadArray<T>(int count, bool enableSwap, T[] target = null) where T : unmanaged {
             target ??= new T[count];
-            ReadSpan<T>(target, count, order, enableSwap);
+            ReadSpan<T>(target, count, enableSwap);
             return target;
         }
 
@@ -536,41 +548,29 @@ namespace Ns {
                         var trunc = curTot - curTot % order;
                         switch (order) {
                             case 2:
+                                var tmp2 = (short*) p;
                                 for (var i = 0; i < trunc; i += 2) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 1];
-                                    p[i + 1] = tmp;
-                                    target.Add(*(T*) (p + i));
+                                    *tmp2 = ReverseEndianness(*tmp2);
+                                    target.Add(*(T*) tmp2);
+                                    tmp2++;
                                 }
 
                                 break;
                             case 4:
+                                var tmp4 = (int*) p;
                                 for (var i = 0; i < trunc; i += 4) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 3];
-                                    p[i + 3] = tmp;
-                                    tmp = p[i + 1];
-                                    p[i + 1] = p[i + 2];
-                                    p[i + 2] = tmp;
-                                    target.Add(*(T*) (p + i));
+                                    *tmp4 = ReverseEndianness(*tmp4);
+                                    target.Add(*(T*) tmp4);
+                                    tmp4++;
                                 }
 
                                 break;
                             case 8:
+                                var tmp8 = (long*) p;
                                 for (var i = 0; i < trunc; i += 8) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 7];
-                                    p[i + 7] = tmp;
-                                    tmp = p[i + 1];
-                                    p[i + 1] = p[i + 6];
-                                    p[i + 6] = tmp;
-                                    tmp = p[i + 2];
-                                    p[i + 2] = p[i + 5];
-                                    p[i + 5] = tmp;
-                                    tmp = p[i + 3];
-                                    p[i + 3] = p[i + 4];
-                                    p[i + 4] = tmp;
-                                    target.Add(*(T*) (p + i));
+                                    *tmp8 = ReverseEndianness(*tmp8);
+                                    target.Add(*(T*) tmp8);
+                                    tmp8++;
                                 }
 
                                 break;
@@ -578,12 +578,14 @@ namespace Ns {
                                 var half = order / 2;
                                 for (var i = 0; i < trunc; i += order) {
                                     for (var j = 0; j < half; j++) {
-                                        var tmp = p[i];
+                                        var fir = i + j;
                                         var sec = i + order - 1 - j;
-                                        p[i] = p[sec];
+                                        var tmp = p[fir];
+                                        p[fir] = p[sec];
                                         p[sec] = tmp;
-                                        target.Add(*(T*) (p + i));
                                     }
+
+                                    target.Add(*(T*) (p + i));
                                 }
 
                                 break;
@@ -611,12 +613,12 @@ namespace Ns {
         /// </summary>
         /// <param name="target">Target buffer</param>
         /// <param name="count">Number of elements</param>
-        /// <param name="order">Length of each element</param>
         /// <param name="enableSwap">Enable element endianness swapping</param>
         /// <typeparam name="T">Type of elements</typeparam>
         /// <exception cref="ApplicationException">If failed to read required number of bytes</exception>
-        public unsafe void ReadSpan<T>(Span<T> target, int count, int order, bool enableSwap) where T : unmanaged {
+        public unsafe void ReadSpan<T>(Span<T> target, int count, bool enableSwap) where T : unmanaged {
             var mainTarget = MemoryMarshal.Cast<T, byte>(target);
+            var order = sizeof(T);
             var mainLen = count * order;
             var buf = Shared.Rent(4096);
             var span = buf.AsSpan();
@@ -637,38 +639,26 @@ namespace Ns {
                     fixed (byte* p = &mainTarget.GetPinnableReference()) {
                         switch (order) {
                             case 2:
+                                var tmp2 = (short*) p;
                                 for (var i = 0; i < mainLen; i += 2) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 1];
-                                    p[i + 1] = tmp;
+                                    *tmp2 = ReverseEndianness(*tmp2);
+                                    tmp2++;
                                 }
 
                                 break;
                             case 4:
+                                var tmp4 = (int*) p;
                                 for (var i = 0; i < mainLen; i += 4) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 3];
-                                    p[i + 3] = tmp;
-                                    tmp = p[i + 1];
-                                    p[i + 1] = p[i + 2];
-                                    p[i + 2] = tmp;
+                                    *tmp4 = ReverseEndianness(*tmp4);
+                                    tmp4++;
                                 }
 
                                 break;
                             case 8:
+                                var tmp8 = (long*) p;
                                 for (var i = 0; i < mainLen; i += 8) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 7];
-                                    p[i + 7] = tmp;
-                                    tmp = p[i + 1];
-                                    p[i + 1] = p[i + 6];
-                                    p[i + 6] = tmp;
-                                    tmp = p[i + 2];
-                                    p[i + 2] = p[i + 5];
-                                    p[i + 5] = tmp;
-                                    tmp = p[i + 3];
-                                    p[i + 3] = p[i + 4];
-                                    p[i + 4] = tmp;
+                                    *tmp8 = ReverseEndianness(*tmp8);
+                                    tmp8++;
                                 }
 
                                 break;
@@ -676,9 +666,10 @@ namespace Ns {
                                 var half = order / 2;
                                 for (var i = 0; i < mainLen; i += order) {
                                     for (var j = 0; j < half; j++) {
-                                        var tmp = p[i];
+                                        var fir = i + j;
                                         var sec = i + order - 1 - j;
-                                        p[i] = p[sec];
+                                        var tmp = p[fir];
+                                        p[fir] = p[sec];
                                         p[sec] = tmp;
                                     }
                                 }
@@ -698,13 +689,13 @@ namespace Ns {
         /// </summary>
         /// <param name="source">Source buffer</param>
         /// <param name="count">Number of elements</param>
-        /// <param name="order">Length of each element</param>
         /// <param name="enableSwap">Enable element endianness swapping</param>
         /// <typeparam name="T">Type of elements</typeparam>
-        public unsafe void WriteSpan<T>(Span<T> source, int count, int order, bool enableSwap) where T : unmanaged {
+        public unsafe void WriteSpan<T>(Span<T> source, int count, bool enableSwap) where T : unmanaged {
             var mainTarget = MemoryMarshal.Cast<T, byte>(source);
             var buf = Shared.Rent(4096);
             var span = buf.AsSpan();
+            var order = sizeof(T);
             var left = count * order;
             var tot = 0;
             try {
@@ -727,38 +718,26 @@ namespace Ns {
                         mainTarget.Slice(tot, cur).CopyTo(buf);
                         switch (order) {
                             case 2:
+                                var tmp2 = (short*) p;
                                 for (var i = 0; i < cur; i += 2) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 1];
-                                    p[i + 1] = tmp;
+                                    *tmp2 = ReverseEndianness(*tmp2);
+                                    tmp2++;
                                 }
 
                                 break;
                             case 4:
+                                var tmp4 = (int*) p;
                                 for (var i = 0; i < cur; i += 4) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 3];
-                                    p[i + 3] = tmp;
-                                    tmp = p[i + 1];
-                                    p[i + 1] = p[i + 2];
-                                    p[i + 2] = tmp;
+                                    *tmp4 = ReverseEndianness(*tmp4);
+                                    tmp4++;
                                 }
 
                                 break;
                             case 8:
+                                var tmp8 = (long*) p;
                                 for (var i = 0; i < cur; i += 8) {
-                                    var tmp = p[i];
-                                    p[i] = p[i + 7];
-                                    p[i + 7] = tmp;
-                                    tmp = p[i + 1];
-                                    p[i + 1] = p[i + 6];
-                                    p[i + 6] = tmp;
-                                    tmp = p[i + 2];
-                                    p[i + 2] = p[i + 5];
-                                    p[i + 5] = tmp;
-                                    tmp = p[i + 3];
-                                    p[i + 3] = p[i + 4];
-                                    p[i + 4] = tmp;
+                                    *tmp8 = ReverseEndianness(*tmp8);
+                                    tmp8++;
                                 }
 
                                 break;
@@ -766,9 +745,10 @@ namespace Ns {
                                 var half = order / 2;
                                 for (var i = 0; i < cur; i += order) {
                                     for (var j = 0; j < half; j++) {
-                                        var tmp = p[i];
+                                        var fir = i + j;
                                         var sec = i + order - 1 - j;
-                                        p[i] = p[sec];
+                                        var tmp = p[fir];
+                                        p[fir] = p[sec];
                                         p[sec] = tmp;
                                     }
                                 }
@@ -794,7 +774,7 @@ namespace Ns {
                 var read = BaseStream.Read(_buffer, tot, length - tot);
                 if (read == 0)
                     throw new ApplicationException(
-                        $"Failed to read required number of bytes! 0x{length:X} left, 0x{BaseStream.Position:X} end position");
+                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{length - tot:X} left, 0x{BaseStream.Position:X} end position");
                 tot += read;
             } while (tot < length);
 
@@ -1230,6 +1210,25 @@ namespace Ns {
         public unsafe void WriteDecimal(decimal value) {
             fixed (byte* buffer = _buffer) *(decimal*) buffer = value;
             BaseStream.Write(_buffer, 0, sizeof(decimal));
+        }
+
+        /// <summary>
+        /// Read Guid value
+        /// </summary>
+        /// <returns>Value</returns>
+        public unsafe Guid ReadGuid() {
+            ReadBase(sizeof(Guid));
+            fixed (byte* buffer = _buffer)
+                return *(Guid*) buffer;
+        }
+
+        /// <summary>
+        /// Write Guid value
+        /// </summary>
+        /// <returns>Value</returns>
+        public unsafe void WriteGuid(Guid value) {
+            fixed (byte* buffer = _buffer) *(Guid*) buffer = value;
+            BaseStream.Write(_buffer, 0, sizeof(Guid));
         }
     }
 }
