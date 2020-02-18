@@ -48,86 +48,20 @@ namespace Ns {
 
             #region Arrays
 
-            RegisterInternal((s, bA) => {
-                    s.WriteS32(bA.Length);
-                    s.WriteSpan<bool>(bA, bA.Length, false);
-                },
-                s => s.ReadArray<bool>(s.ReadS32(), false));
-
-            RegisterInternal((s, u8A) => {
-                    s.WriteS32(u8A.Length);
-                    s.WriteSpan<byte>(u8A, u8A.Length, false);
-                },
-                s => s.ReadArray<byte>(s.ReadS32(), false));
-
-            RegisterInternal((s, s8A) => {
-                    s.WriteS32(s8A.Length);
-                    s.WriteSpan<sbyte>(s8A, s8A.Length, false);
-                },
-                s => s.ReadArray<sbyte>(s.ReadS32(), false));
-
-            RegisterInternal((s, u16A) => {
-                    s.WriteS32(u16A.Length);
-                    s.WriteSpan<ushort>(u16A, u16A.Length, true);
-                },
-                s => s.ReadArray<ushort>(s.ReadS32(), true));
-
-            RegisterInternal((s, s16A) => {
-                    s.WriteS32(s16A.Length);
-                    s.WriteSpan<short>(s16A, s16A.Length, true);
-                },
-                s => s.ReadArray<short>(s.ReadS32(), true));
-
-            RegisterInternal((s, u32A) => {
-                s.WriteS32(u32A.Length);
-                s.WriteSpan<uint>(u32A, u32A.Length, true);
-            }, s => s.ReadArray<uint>(s.ReadS32(), true));
-
-            RegisterInternal((s, s32A) => {
-                s.WriteS32(s32A.Length);
-                s.WriteSpan<int>(s32A, s32A.Length, true);
-            }, s => s.ReadArray<int>(s.ReadS32(), true));
-
-            RegisterInternal((s, u64A) => {
-                    s.WriteS32(u64A.Length);
-                    s.WriteSpan<ulong>(u64A, u64A.Length, true);
-                },
-                s => s.ReadArray<ulong>(s.ReadS32(), true));
-
-            RegisterInternal((s, s64A) => {
-                s.WriteS32(s64A.Length);
-                s.WriteSpan<long>(s64A, s64A.Length, true);
-            }, s => s.ReadArray<long>(s.ReadS32(), true));
-
-            RegisterInternal((s, fA) => {
-                    s.WriteS32(fA.Length);
-                    s.WriteSpan<float>(fA, fA.Length, false);
-                },
-                s => s.ReadArray<float>(s.ReadS32(), false));
-
-            RegisterInternal((s, dA) => {
-                    s.WriteS32(dA.Length);
-                    s.WriteSpan<double>(dA, dA.Length, false);
-                },
-                s => s.ReadArray<double>(s.ReadS32(), false));
-
-            RegisterInternal((s, deA) => {
-                    s.WriteS32(deA.Length);
-                    s.WriteSpan<decimal>(deA, deA.Length, false);
-                },
-                s => s.ReadArray<decimal>(s.ReadS32(), false));
-
-            RegisterInternal((s, cA) => {
-                    s.WriteS32(cA.Length);
-                    s.WriteSpan<char>(cA, cA.Length, false);
-                },
-                s => s.ReadArray<char>(s.ReadS32(), false));
-
-            RegisterInternal((s, guA) => {
-                    s.WriteS32(guA.Length);
-                    s.WriteSpan<Guid>(guA, guA.Length, false);
-                },
-                s => s.ReadArray<Guid>(s.ReadS32(), false));
+            RegisterInternal(MakeNativeArrayEncoder<bool>(false), MakeNativeArrayDecoder<bool>(false));
+            RegisterInternal(MakeNativeArrayEncoder<byte>(false), MakeNativeArrayDecoder<byte>(false));
+            RegisterInternal(MakeNativeArrayEncoder<sbyte>(false), MakeNativeArrayDecoder<sbyte>(false));
+            RegisterInternal(MakeNativeArrayEncoder<ushort>(true), MakeNativeArrayDecoder<ushort>(true));
+            RegisterInternal(MakeNativeArrayEncoder<short>(true), MakeNativeArrayDecoder<short>(true));
+            RegisterInternal(MakeNativeArrayEncoder<uint>(true), MakeNativeArrayDecoder<uint>(true));
+            RegisterInternal(MakeNativeArrayEncoder<int>(true), MakeNativeArrayDecoder<int>(true));
+            RegisterInternal(MakeNativeArrayEncoder<ulong>(true), MakeNativeArrayDecoder<ulong>(true));
+            RegisterInternal(MakeNativeArrayEncoder<long>(true), MakeNativeArrayDecoder<long>(true));
+            RegisterInternal(MakeNativeArrayEncoder<float>(false), MakeNativeArrayDecoder<float>(false));
+            RegisterInternal(MakeNativeArrayEncoder<double>(false), MakeNativeArrayDecoder<double>(false));
+            RegisterInternal(MakeNativeArrayEncoder<char>(true), MakeNativeArrayDecoder<char>(true));
+            RegisterInternal(MakeNativeArrayEncoder<decimal>(false), MakeNativeArrayDecoder<decimal>(false));
+            RegisterInternal(MakeNativeArrayEncoder<Guid>(false), MakeNativeArrayDecoder<Guid>(false));
 
             #endregion
 
@@ -283,6 +217,19 @@ namespace Ns {
             TypeConverter<T>.Converter = (encoder, decoder);
             TypeConverter<T>.Init = true;
         }
+
+        private static Action<NetSerializer, T[]> MakeNativeArrayEncoder<T>(bool enableSwap)
+            where T : unmanaged =>
+            (s, arr) => {
+                {
+                    s.WriteS32(arr.Length);
+                    s.WriteSpan<T>(arr, arr.Length, enableSwap);
+                }
+            };
+
+        private static Func<NetSerializer, T[]> MakeNativeArrayDecoder<T>(bool enableSwap)
+            where T : unmanaged =>
+            s => s.ReadArray<T>(s.ReadS32(), enableSwap);
 
         private static Action<NetSerializer, T[]> MakeArrayEncoder<T>(Action<NetSerializer, T> encoder, bool nc) =>
             (s, arr) => {
@@ -481,6 +428,8 @@ namespace Ns {
         private Decoder _decoder;
         private Encoder Encoder => _encoder ??= Encoding.UTF8.GetEncoder();
         private Encoder _encoder;
+        private StringBuilder StringBuilder => _stringBuilder ??= new StringBuilder();
+        private StringBuilder _stringBuilder;
 
         /// <summary>
         /// Create new NetSerializer instance
@@ -787,7 +736,6 @@ namespace Ns {
         /// <returns>Decoded string</returns>
         public unsafe string ReadUtf8String() {
             Decoder.Reset();
-            var b = new StringBuilder();
             var tmpBuf = Shared.Rent(4096);
             try {
                 fixed (byte* tmpBufPtr = tmpBuf) {
@@ -802,7 +750,7 @@ namespace Ns {
                             do {
                                 Decoder.Convert(tmpBufPtr + cur, read - cur, charPtr, 2048 / sizeof(char),
                                     false, out var numIn, out var numOut, out _);
-                                b.Append(charPtr, numOut);
+                                StringBuilder.Append(charPtr, numOut);
                                 cur += numIn;
                             } while (cur != read);
 
@@ -814,13 +762,14 @@ namespace Ns {
                                 $"Failed to read required number of bytes! 0x{tot:X} read, 0x{tot:X} left, 0x{BaseStream.Position:X} end position");
                     }
                 }
+
+                var str = StringBuilder.ToString();
+                StringBuilder.Clear();
+                return str;
             }
             finally {
                 Shared.Return(tmpBuf);
-                //ArrayPool<byte>.Shared.Return(tmpBufOut);
             }
-
-            return b.ToString();
         }
 
         /// <summary>
@@ -1159,18 +1108,14 @@ namespace Ns {
         /// Read single-precision floating-point value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe float ReadSingle() {
-            ReadBase(sizeof(float));
-            fixed (byte* buffer = _buffer)
-                return *(float*) buffer;
-        }
+        public float ReadSingle() => MemoryMarshal.Read<float>(ReadBase(sizeof(float)));
 
         /// <summary>
         /// Write single-precision floating-point value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteSingle(float value) {
-            fixed (byte* buffer = _buffer) *(float*) buffer = value;
+        public void WriteSingle(float value) {
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(float));
         }
 
@@ -1178,18 +1123,14 @@ namespace Ns {
         /// Read double-precision floating-point value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe double ReadDouble() {
-            ReadBase(sizeof(double));
-            fixed (byte* buffer = _buffer)
-                return *(double*) buffer;
-        }
+        public double ReadDouble() => MemoryMarshal.Read<double>(ReadBase(sizeof(double)));
 
         /// <summary>
         /// Write double-precision floating-point value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteDouble(double value) {
-            fixed (byte* buffer = _buffer) *(double*) buffer = value;
+        public void WriteDouble(double value) {
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(double));
         }
 
@@ -1197,18 +1138,14 @@ namespace Ns {
         /// Read decimal value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe decimal ReadDecimal() {
-            ReadBase(sizeof(decimal));
-            fixed (byte* buffer = _buffer)
-                return *(decimal*) buffer;
-        }
+        public decimal ReadDecimal() => MemoryMarshal.Read<decimal>(ReadBase(sizeof(decimal)));
 
         /// <summary>
         /// Write decimal value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteDecimal(decimal value) {
-            fixed (byte* buffer = _buffer) *(decimal*) buffer = value;
+        public void WriteDecimal(decimal value) {
+            MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, sizeof(decimal));
         }
 
@@ -1216,19 +1153,15 @@ namespace Ns {
         /// Read Guid value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe Guid ReadGuid() {
-            ReadBase(sizeof(Guid));
-            fixed (byte* buffer = _buffer)
-                return *(Guid*) buffer;
-        }
+        public Guid ReadGuid() => MemoryMarshal.Read<Guid>(ReadBase(16));
 
         /// <summary>
         /// Write Guid value
         /// </summary>
         /// <returns>Value</returns>
-        public unsafe void WriteGuid(Guid value) {
-            fixed (byte* buffer = _buffer) *(Guid*) buffer = value;
-            BaseStream.Write(_buffer, 0, sizeof(Guid));
+        public void WriteGuid(Guid value) {
+            MemoryMarshal.Write(_buffer, ref value);
+            BaseStream.Write(_buffer, 0, 16);
         }
     }
 }
