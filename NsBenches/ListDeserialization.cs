@@ -12,16 +12,16 @@ namespace NsBenches {
         private readonly MemoryStream _ms;
         private readonly NetSerializer _ns;
 
-        // ReSharper disable once UnusedAutoPropertyAccessor.Global
-        // ReSharper disable once MemberCanBePrivate.Global
-        [Params(Nss, Ns, N)] public int C { get; set; }
-
         public ListDeserialization() {
             var data = new byte[N * sizeof(long)];
             new Random(42).NextBytes(data);
             _ms = new MemoryStream(data);
             _ns = new NetSerializer(_ms);
         }
+
+        // ReSharper disable once UnusedAutoPropertyAccessor.Global
+        // ReSharper disable once MemberCanBePrivate.Global
+        [Params(Nss, Ns, N)] public int C { get; set; }
 
         [Benchmark]
         public List<byte> NonBufferedByte() {

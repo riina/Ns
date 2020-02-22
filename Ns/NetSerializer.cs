@@ -10,19 +10,18 @@ using static System.Buffers.Binary.BinaryPrimitives;
 
 namespace Ns {
     /// <summary>
-    /// Manages serialization to / deserialization from a stream
+    ///     Manages serialization to / deserialization from a stream
     /// </summary>
     [SuppressMessage("ReSharper", "MemberCanBePrivate.Global")]
     [SuppressMessage("ReSharper", "UnusedMember.Global")]
     [SuppressMessage("ReSharper", "UnusedMethodReturnValue.Global")]
     public class NetSerializer {
-        [SuppressMessage("ReSharper", "StaticMemberInGenericType")]
-        private static class TypeConverter<T> {
-            static TypeConverter() => RuntimeHelpers.RunClassConstructor(typeof(T).TypeHandle);
+        private static readonly bool Swap = BitConverter.IsLittleEndian;
 
-            public static (Action<NetSerializer, T>encoder, Func<NetSerializer, T> decoder) Converter;
-            public static bool Init;
-        }
+        private readonly byte[] _buffer = new byte[sizeof(decimal)];
+        private Decoder _decoder;
+        private Encoder _encoder;
+        private StringBuilder _stringBuilder;
 
         static NetSerializer() {
             #region Register primitives
@@ -213,66 +212,97 @@ namespace Ns {
             #endregion
         }
 
+        /// <summary>
+        ///     Create new NetSerializer instance
+        /// </summary>
+        /// <param name="baseStream">Stream to wrap</param>
+        public NetSerializer(Stream baseStream) {
+            BaseStream = baseStream;
+        }
+
+        /// <summary>
+        ///     Stream this instance wraps
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+        public Stream BaseStream { get; set; }
+
+        /// <summary>
+        ///     Converters specific to this serializer
+        /// </summary>
+        // ReSharper disable once UnusedAutoPropertyAccessor.Global
+        public Dictionary<Type, (object encoder, object decoder)> CustomConverters { get; set; }
+
+        private Decoder Decoder => _decoder ??= Encoding.UTF8.GetDecoder();
+        private Encoder Encoder => _encoder ??= Encoding.UTF8.GetEncoder();
+        private StringBuilder StringBuilder => _stringBuilder ??= new StringBuilder();
+
         private static void RegisterInternal<T>(Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) {
             TypeConverter<T>.Converter = (encoder, decoder);
             TypeConverter<T>.Init = true;
         }
 
         private static Action<NetSerializer, T[]> MakeNativeArrayEncoder<T>(bool enableSwap)
-            where T : unmanaged =>
-            (s, arr) => {
+            where T : unmanaged {
+            return (s, arr) => {
                 {
                     s.WriteS32(arr.Length);
                     s.WriteSpan<T>(arr, arr.Length, enableSwap);
                 }
             };
+        }
 
         private static Func<NetSerializer, T[]> MakeNativeArrayDecoder<T>(bool enableSwap)
-            where T : unmanaged =>
-            s => s.ReadArray<T>(s.ReadS32(), enableSwap);
+            where T : unmanaged {
+            return s => s.ReadArray<T>(s.ReadS32(), enableSwap);
+        }
 
-        private static Action<NetSerializer, T[]> MakeArrayEncoder<T>(Action<NetSerializer, T> encoder, bool nc) =>
-            (s, arr) => {
+        private static Action<NetSerializer, T[]> MakeArrayEncoder<T>(Action<NetSerializer, T> encoder, bool nc) {
+            return (s, arr) => {
                 s.WriteS32(arr.Length);
                 foreach (var e in arr) s.Serialize(e, nc, encoder);
             };
+        }
 
-        private static Func<NetSerializer, T[]> MakeArrayDecoder<T>(Func<NetSerializer, T> decoder, bool nc) =>
-            s => {
+        private static Func<NetSerializer, T[]> MakeArrayDecoder<T>(Func<NetSerializer, T> decoder, bool nc) {
+            return s => {
                 var count = s.ReadS32();
                 var res = new T[count];
                 for (var i = 0; i < count; i++) res[i] = s.Deserialize(nc, decoder);
                 return res;
             };
+        }
 
-        private static Action<NetSerializer, List<T>> MakeListEncoder<T>(Action<NetSerializer, T> encoder, bool nc) =>
-            (s, list) => {
+        private static Action<NetSerializer, List<T>> MakeListEncoder<T>(Action<NetSerializer, T> encoder, bool nc) {
+            return (s, list) => {
                 s.WriteS32(list.Count);
                 foreach (var e in list) s.Serialize(e, nc, encoder);
             };
+        }
 
-        private static Func<NetSerializer, List<T>> MakeListDecoder<T>(Func<NetSerializer, T> decoder, bool nc) =>
-            s => {
+        private static Func<NetSerializer, List<T>> MakeListDecoder<T>(Func<NetSerializer, T> decoder, bool nc) {
+            return s => {
                 var count = s.ReadS32();
                 var res = new List<T>(count);
                 for (var i = 0; i < count; i++) res.Add(s.Deserialize(nc, decoder));
                 return res;
             };
+        }
 
         private static Action<NetSerializer, Dictionary<TKey, TValue>> MakeDictionaryEncoder<TKey, TValue>(
             Action<NetSerializer, TKey> keyEncoder, bool keyNc, Action<NetSerializer, TValue> valueEncoder,
-            bool valueNc) =>
-            (s, dict) => {
+            bool valueNc) {
+            return (s, dict) => {
                 s.WriteS32(dict.Count);
                 foreach (var kvp in dict) {
                     s.Serialize(kvp.Key, keyNc, keyEncoder);
                     s.Serialize(kvp.Value, valueNc, valueEncoder);
                 }
             };
+        }
 
         private static Func<NetSerializer, Dictionary<TKey, TValue>> MakeDictionaryDecoder<TKey, TValue>(
-            Func<NetSerializer, TKey> keyDecoder, bool keyNc, Func<NetSerializer, TValue> valueDecoder, bool valueNc)
-            => s => {
+            Func<NetSerializer, TKey> keyDecoder, bool keyNc, Func<NetSerializer, TValue> valueDecoder, bool valueNc) {
+            return s => {
                 var dict = new Dictionary<TKey, TValue>();
                 var count = s.ReadS32();
                 for (var i = 0; i < count; i++) {
@@ -283,12 +313,18 @@ namespace Ns {
 
                 return dict;
             };
+        }
 
-        private static void StrEncoder(NetSerializer s, string str) => s.WriteUtf8String(str);
-        private static string StrDecoder(NetSerializer s) => s.ReadUtf8String();
+        private static void StrEncoder(NetSerializer s, string str) {
+            s.WriteUtf8String(str);
+        }
+
+        private static string StrDecoder(NetSerializer s) {
+            return s.ReadUtf8String();
+        }
 
         /// <summary>
-        /// Register a type's encoder and decoder
+        ///     Register a type's encoder and decoder
         /// </summary>
         /// <param name="encoder">Encoder for object to stream</param>
         /// <param name="decoder">Decoder for stream to object</param>
@@ -305,7 +341,27 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Register dictionary type
+        ///     Register a type's encoder and decoder
+        /// </summary>
+        /// <param name="converters">Custom converter mapping</param>
+        /// <param name="encoder">Encoder for object to stream</param>
+        /// <param name="decoder">Decoder for stream to object</param>
+        /// <param name="generateCollectionConverters">Generate converters for basic collections</param>
+        public static void RegisterCustom<T>(Dictionary<Type, (object encoder, object decoder)> converters,
+            Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder,
+            bool generateCollectionConverters = true) {
+            converters[typeof(T)] = (encoder, decoder);
+            if (!generateCollectionConverters) return;
+            var nc = !typeof(T).IsValueType;
+            converters[typeof(T[])] = (MakeArrayEncoder(encoder, nc), MakeArrayDecoder(decoder, nc));
+            converters[typeof(List<T>)] = (MakeListEncoder(encoder, nc), MakeListDecoder(decoder, nc));
+            converters[typeof(Dictionary<string, T>)] = (
+                MakeDictionaryEncoder<string, T>(StrEncoder, true, encoder, nc),
+                MakeDictionaryDecoder(StrDecoder, true, decoder, nc));
+        }
+
+        /// <summary>
+        ///     Register dictionary type
         /// </summary>
         /// <typeparam name="TKey">Dictionary key type</typeparam>
         /// <typeparam name="TValue">Dictionary value type</typeparam>
@@ -326,7 +382,30 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Get encoder/decoder pair for type
+        ///     Register dictionary type
+        /// </summary>
+        /// <param name="converters">Custom converter mapping</param>
+        /// <typeparam name="TKey">Dictionary key type</typeparam>
+        /// <typeparam name="TValue">Dictionary value type</typeparam>
+        /// <exception cref="ApplicationException">If unregistered types are used</exception>
+        public static void AddDictionaryCustom<TKey, TValue>(
+            Dictionary<Type, (object encoder, object decoder)> converters) {
+            if (!GetConverterCustom<TKey>(converters, out var key))
+                throw new ApplicationException(
+                    "Cannot add dictionary converters if dictionary key type is not already registered");
+            if (!GetConverterCustom<TValue>(converters, out var value))
+                throw new ApplicationException(
+                    "Cannot add dictionary converters if dictionary value type is not already registered");
+            var (keyE, keyD) = key;
+            var (valueE, valueD) = value;
+            var ncKey = !typeof(TKey).IsValueType;
+            var ncValue = !typeof(TValue).IsValueType;
+            converters[typeof(Dictionary<TKey, TValue>)] = (MakeDictionaryEncoder(keyE, ncKey, valueE, ncValue),
+                MakeDictionaryDecoder(keyD, ncKey, valueD, ncValue));
+        }
+
+        /// <summary>
+        ///     Get encoder/decoder pair for type
         /// </summary>
         /// <param name="res">Encoder and decoder</param>
         /// <typeparam name="T">Type to retrieve encoder/decoder for</typeparam>
@@ -338,32 +417,61 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Serialize an object
+        ///     Get encoder/decoder pair for type
+        /// </summary>
+        /// <param name="converters">Custom converter mapping</param>
+        /// <param name="res">Encoder and decoder</param>
+        /// <typeparam name="T">Type to retrieve encoder/decoder for</typeparam>
+        /// <returns>True if encoder/decoder were obtained</returns>
+        public static bool GetConverterCustom<T>(Dictionary<Type, (object encoder, object decoder)> converters,
+            out (Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) res) {
+            res = default;
+            if (!converters.TryGetValue(typeof(T), out var resX))
+                return false;
+            if (!(resX.encoder is Action<NetSerializer, T> encoder)) return false;
+            if (!(resX.decoder is Func<NetSerializer, T> decoder)) return false;
+            res = (encoder, decoder);
+            return true;
+        }
+
+        /// <summary>
+        ///     Get encoder/decoder pair for type
+        /// </summary>
+        /// <param name="res">Encoder and decoder</param>
+        /// <typeparam name="T">Type to retrieve encoder/decoder for</typeparam>
+        /// <returns>True if encoder/decoder were obtained</returns>
+        public bool GetConverterLocal<T>(
+            out (Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) res) {
+            return CustomConverters != null && GetConverterCustom(CustomConverters, out res) || GetConverter(out res);
+        }
+
+        /// <summary>
+        ///     Serialize an object
         /// </summary>
         /// <param name="obj">Object to serialize</param>
         /// <typeparam name="T">Type of object to be serialized</typeparam>
         /// <exception cref="ApplicationException">If attempting to serialize unregistered type</exception>
         public void Serialize<T>(T obj) {
-            if (!TypeConverter<T>.Init)
+            if (!GetConverterLocal<T>(out var res))
                 throw new ApplicationException("Tried to serialize unregistered type");
-            Serialize(obj, !typeof(T).IsValueType, TypeConverter<T>.Converter.encoder);
+            Serialize(obj, !typeof(T).IsValueType, res.encoder);
         }
 
         /// <summary>
-        /// Serialize an object
+        ///     Serialize an object
         /// </summary>
         /// <param name="obj">Object to serialize</param>
         /// <param name="nullCheck">Serialize null state</param>
         /// <typeparam name="T">Type of object to be serialized</typeparam>
         /// <exception cref="ApplicationException">If attempting to serialize unregistered type</exception>
         public void Serialize<T>(T obj, bool nullCheck) {
-            if (!TypeConverter<T>.Init)
+            if (!GetConverterLocal<T>(out var res))
                 throw new ApplicationException("Tried to serialize unregistered type");
-            Serialize(obj, nullCheck, TypeConverter<T>.Converter.encoder);
+            Serialize(obj, nullCheck, res.encoder);
         }
 
         /// <summary>
-        /// Serialize an object
+        ///     Serialize an object
         /// </summary>
         /// <param name="obj">Object to serialize</param>
         /// <param name="nullCheck">Serialize null state</param>
@@ -380,31 +488,31 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Deserialize an object
+        ///     Deserialize an object
         /// </summary>
         /// <typeparam name="T">Type of object to be deserialized</typeparam>
         /// <exception cref="ApplicationException">If attempting to serialize unregistered type</exception>
         /// <returns>Deserialized object or null</returns>
         public T Deserialize<T>() {
-            if (!TypeConverter<T>.Init)
+            if (!GetConverterLocal<T>(out var res))
                 throw new ApplicationException("Tried to deserialize unregistered type");
-            return Deserialize(!typeof(T).IsValueType, TypeConverter<T>.Converter.decoder);
+            return Deserialize(!typeof(T).IsValueType, res.decoder);
         }
 
         /// <summary>
-        /// Deserialize an object
+        ///     Deserialize an object
         /// </summary>
         /// <param name="nullCheck">Deserialize null state</param>
         /// <typeparam name="T">Type of object to be deserialized</typeparam>
         /// <returns>Deserialized object or null</returns>
         public T Deserialize<T>(bool nullCheck) {
-            if (!TypeConverter<T>.Init)
+            if (!GetConverterLocal<T>(out var res))
                 throw new ApplicationException("Tried to deserialize unregistered type");
-            return Deserialize(nullCheck, TypeConverter<T>.Converter.decoder);
+            return Deserialize(nullCheck, res.decoder);
         }
 
         /// <summary>
-        /// Deserialize an object
+        ///     Deserialize an object
         /// </summary>
         /// <param name="nullCheck">Deserialize null state</param>
         /// <param name="decoder">Decoder to use</param>
@@ -415,30 +523,8 @@ namespace Ns {
             return decoder.Invoke(this);
         }
 
-        private static readonly bool Swap = BitConverter.IsLittleEndian;
-
         /// <summary>
-        /// Stream this instance wraps
-        /// </summary>
-        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
-        public Stream BaseStream { get; set; }
-
-        private readonly byte[] _buffer = new byte[sizeof(decimal)];
-        private Decoder Decoder => _decoder ??= Encoding.UTF8.GetDecoder();
-        private Decoder _decoder;
-        private Encoder Encoder => _encoder ??= Encoding.UTF8.GetEncoder();
-        private Encoder _encoder;
-        private StringBuilder StringBuilder => _stringBuilder ??= new StringBuilder();
-        private StringBuilder _stringBuilder;
-
-        /// <summary>
-        /// Create new NetSerializer instance
-        /// </summary>
-        /// <param name="baseStream">Stream to wrap</param>
-        public NetSerializer(Stream baseStream) => BaseStream = baseStream;
-
-        /// <summary>
-        /// Read array
+        ///     Read array
         /// </summary>
         /// <param name="count">Number of elements</param>
         /// <param name="enableSwap">Enable element endianness swapping</param>
@@ -453,7 +539,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read list
+        ///     Read list
         /// </summary>
         /// <param name="count">Number of elements</param>
         /// <param name="enableSwap">Enable element endianness swapping</param>
@@ -558,7 +644,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read span
+        ///     Read span
         /// </summary>
         /// <param name="target">Target buffer</param>
         /// <param name="count">Number of elements</param>
@@ -584,7 +670,7 @@ namespace Ns {
                     throw new ApplicationException(
                         $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left, 0x{BaseStream.Position:X} end position");
 
-                if (order != 1 && enableSwap && Swap) {
+                if (order != 1 && enableSwap && Swap)
                     fixed (byte* p = &mainTarget.GetPinnableReference()) {
                         switch (order) {
                             case 2:
@@ -613,20 +699,18 @@ namespace Ns {
                                 break;
                             default:
                                 var half = order / 2;
-                                for (var i = 0; i < mainLen; i += order) {
-                                    for (var j = 0; j < half; j++) {
-                                        var fir = i + j;
-                                        var sec = i + order - 1 - j;
-                                        var tmp = p[fir];
-                                        p[fir] = p[sec];
-                                        p[sec] = tmp;
-                                    }
+                                for (var i = 0; i < mainLen; i += order)
+                                for (var j = 0; j < half; j++) {
+                                    var fir = i + j;
+                                    var sec = i + order - 1 - j;
+                                    var tmp = p[fir];
+                                    p[fir] = p[sec];
+                                    p[sec] = tmp;
                                 }
 
                                 break;
                         }
                     }
-                }
             }
             finally {
                 Shared.Return(buf);
@@ -634,7 +718,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Write span
+        ///     Write span
         /// </summary>
         /// <param name="source">Source buffer</param>
         /// <param name="count">Number of elements</param>
@@ -692,14 +776,13 @@ namespace Ns {
                                 break;
                             default:
                                 var half = order / 2;
-                                for (var i = 0; i < cur; i += order) {
-                                    for (var j = 0; j < half; j++) {
-                                        var fir = i + j;
-                                        var sec = i + order - 1 - j;
-                                        var tmp = p[fir];
-                                        p[fir] = p[sec];
-                                        p[sec] = tmp;
-                                    }
+                                for (var i = 0; i < cur; i += order)
+                                for (var j = 0; j < half; j++) {
+                                    var fir = i + j;
+                                    var sec = i + order - 1 - j;
+                                    var tmp = p[fir];
+                                    p[fir] = p[sec];
+                                    p[sec] = tmp;
                                 }
 
                                 break;
@@ -731,7 +814,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read UTF-8 string
+        ///     Read UTF-8 string
         /// </summary>
         /// <returns>Decoded string</returns>
         public unsafe string ReadUtf8String() {
@@ -773,7 +856,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Write UTF-8 string
+        ///     Write UTF-8 string
         /// </summary>
         /// <param name="value">String to write</param>
         public unsafe void WriteUtf8String(string value) {
@@ -803,7 +886,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Decode 32-bit integer
+        ///     Decode 32-bit integer
         /// </summary>
         /// <param name="len">Length of decoded value</param>
         /// <returns>Decoded value</returns>
@@ -839,7 +922,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Encode 32-bit integer
+        ///     Encode 32-bit integer
         /// </summary>
         /// <param name="value">Value to encode</param>
         /// <returns>Length of encoded value</returns>
@@ -873,7 +956,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Decode 64-bit integer
+        ///     Decode 64-bit integer
         /// </summary>
         /// <param name="len">Length of decoded value</param>
         /// <returns>Decoded value</returns>
@@ -909,7 +992,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Encode 64-bit integer
+        ///     Encode 64-bit integer
         /// </summary>
         /// <param name="value">Value to encode</param>
         /// <returns>Length of encoded value</returns>
@@ -943,7 +1026,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read signed 8-byte value
+        ///     Read signed 8-byte value
         /// </summary>
         /// <returns>Value</returns>
         public sbyte ReadS8() {
@@ -952,7 +1035,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Write signed 8-byte value
+        ///     Write signed 8-byte value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteS8(sbyte value) {
@@ -961,7 +1044,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read unsigned 8-byte value
+        ///     Read unsigned 8-byte value
         /// </summary>
         /// <returns>Value</returns>
         public byte ReadU8() {
@@ -970,7 +1053,7 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Write unsigned 8-byte value
+        ///     Write unsigned 8-byte value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteU8(byte value) {
@@ -979,17 +1062,18 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read signed 16-byte value
+        ///     Read signed 16-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public short ReadS16() =>
-            Swap
+        public short ReadS16() {
+            return Swap
                 ? ReverseEndianness(
                     MemoryMarshal.Read<short>(ReadBase(sizeof(short))))
                 : MemoryMarshal.Read<short>(ReadBase(sizeof(short)));
+        }
 
         /// <summary>
-        /// Write signed 16-byte value
+        ///     Write signed 16-byte value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteS16(short value) {
@@ -1000,17 +1084,18 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read unsigned 16-byte value
+        ///     Read unsigned 16-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public ushort ReadU16() =>
-            Swap
+        public ushort ReadU16() {
+            return Swap
                 ? ReverseEndianness(
                     MemoryMarshal.Read<ushort>(ReadBase(sizeof(ushort))))
                 : MemoryMarshal.Read<ushort>(ReadBase(sizeof(ushort)));
+        }
 
         /// <summary>
-        /// Write unsigned 16-byte value
+        ///     Write unsigned 16-byte value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteU16(ushort value) {
@@ -1021,17 +1106,18 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read signed 32-byte value
+        ///     Read signed 32-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public int ReadS32() =>
-            Swap
+        public int ReadS32() {
+            return Swap
                 ? ReverseEndianness(
                     MemoryMarshal.Read<int>(ReadBase(sizeof(int))))
                 : MemoryMarshal.Read<int>(ReadBase(sizeof(int)));
+        }
 
         /// <summary>
-        /// Write signed 32-byte value
+        ///     Write signed 32-byte value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteS32(int value) {
@@ -1042,17 +1128,18 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read unsigned 32-byte value
+        ///     Read unsigned 32-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public uint ReadU32() =>
-            Swap
+        public uint ReadU32() {
+            return Swap
                 ? ReverseEndianness(
                     MemoryMarshal.Read<uint>(ReadBase(sizeof(uint))))
                 : MemoryMarshal.Read<uint>(ReadBase(sizeof(uint)));
+        }
 
         /// <summary>
-        /// Write unsigned 32-byte value
+        ///     Write unsigned 32-byte value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteU32(uint value) {
@@ -1063,17 +1150,18 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read signed 64-byte value
+        ///     Read signed 64-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public long ReadS64() =>
-            Swap
+        public long ReadS64() {
+            return Swap
                 ? ReverseEndianness(
                     MemoryMarshal.Read<long>(ReadBase(sizeof(long))))
                 : MemoryMarshal.Read<long>(ReadBase(sizeof(long)));
+        }
 
         /// <summary>
-        /// Write signed 64-byte value
+        ///     Write signed 64-byte value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteS64(long value) {
@@ -1084,17 +1172,18 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read unsigned 64-byte value
+        ///     Read unsigned 64-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public ulong ReadU64() =>
-            Swap
+        public ulong ReadU64() {
+            return Swap
                 ? ReverseEndianness(
                     MemoryMarshal.Read<ulong>(ReadBase(sizeof(ulong))))
                 : MemoryMarshal.Read<ulong>(ReadBase(sizeof(ulong)));
+        }
 
         /// <summary>
-        /// Write unsigned 64-byte value
+        ///     Write unsigned 64-byte value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteU64(ulong value) {
@@ -1105,13 +1194,15 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read single-precision floating-point value
+        ///     Read single-precision floating-point value
         /// </summary>
         /// <returns>Value</returns>
-        public float ReadSingle() => MemoryMarshal.Read<float>(ReadBase(sizeof(float)));
+        public float ReadSingle() {
+            return MemoryMarshal.Read<float>(ReadBase(sizeof(float)));
+        }
 
         /// <summary>
-        /// Write single-precision floating-point value
+        ///     Write single-precision floating-point value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteSingle(float value) {
@@ -1120,13 +1211,15 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read double-precision floating-point value
+        ///     Read double-precision floating-point value
         /// </summary>
         /// <returns>Value</returns>
-        public double ReadDouble() => MemoryMarshal.Read<double>(ReadBase(sizeof(double)));
+        public double ReadDouble() {
+            return MemoryMarshal.Read<double>(ReadBase(sizeof(double)));
+        }
 
         /// <summary>
-        /// Write double-precision floating-point value
+        ///     Write double-precision floating-point value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteDouble(double value) {
@@ -1135,13 +1228,15 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read decimal value
+        ///     Read decimal value
         /// </summary>
         /// <returns>Value</returns>
-        public decimal ReadDecimal() => MemoryMarshal.Read<decimal>(ReadBase(sizeof(decimal)));
+        public decimal ReadDecimal() {
+            return MemoryMarshal.Read<decimal>(ReadBase(sizeof(decimal)));
+        }
 
         /// <summary>
-        /// Write decimal value
+        ///     Write decimal value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteDecimal(decimal value) {
@@ -1150,18 +1245,30 @@ namespace Ns {
         }
 
         /// <summary>
-        /// Read Guid value
+        ///     Read Guid value
         /// </summary>
         /// <returns>Value</returns>
-        public Guid ReadGuid() => MemoryMarshal.Read<Guid>(ReadBase(16));
+        public Guid ReadGuid() {
+            return MemoryMarshal.Read<Guid>(ReadBase(16));
+        }
 
         /// <summary>
-        /// Write Guid value
+        ///     Write Guid value
         /// </summary>
         /// <returns>Value</returns>
         public void WriteGuid(Guid value) {
             MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, 16);
+        }
+
+        [SuppressMessage("ReSharper", "StaticMemberInGenericType")]
+        private static class TypeConverter<T> {
+            public static (Action<NetSerializer, T>encoder, Func<NetSerializer, T> decoder) Converter;
+            public static bool Init;
+
+            static TypeConverter() {
+                RuntimeHelpers.RunClassConstructor(typeof(T).TypeHandle);
+            }
         }
     }
 }
