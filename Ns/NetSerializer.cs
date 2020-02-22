@@ -216,8 +216,10 @@ namespace Ns {
         ///     Create new NetSerializer instance
         /// </summary>
         /// <param name="baseStream">Stream to wrap</param>
-        public NetSerializer(Stream baseStream) {
+        /// <param name="converters">Custom converters to use</param>
+        public NetSerializer(Stream baseStream, IReadOnlyDictionary<Type, (object encoder, object decoder)> converters = null) {
             BaseStream = baseStream;
+            CustomConverters = converters;
         }
 
         /// <summary>
@@ -230,7 +232,7 @@ namespace Ns {
         ///     Converters specific to this serializer
         /// </summary>
         // ReSharper disable once UnusedAutoPropertyAccessor.Global
-        public Dictionary<Type, (object encoder, object decoder)> CustomConverters { get; set; }
+        public IReadOnlyDictionary<Type, (object encoder, object decoder)> CustomConverters { get; set; }
 
         private Decoder Decoder => _decoder ??= Encoding.UTF8.GetDecoder();
         private Encoder Encoder => _encoder ??= Encoding.UTF8.GetEncoder();
@@ -423,7 +425,7 @@ namespace Ns {
         /// <param name="res">Encoder and decoder</param>
         /// <typeparam name="T">Type to retrieve encoder/decoder for</typeparam>
         /// <returns>True if encoder/decoder were obtained</returns>
-        public static bool GetConverterCustom<T>(Dictionary<Type, (object encoder, object decoder)> converters,
+        public static bool GetConverterCustom<T>(IReadOnlyDictionary<Type, (object encoder, object decoder)> converters,
             out (Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) res) {
             res = default;
             if (!converters.TryGetValue(typeof(T), out var resX))
@@ -573,7 +575,7 @@ namespace Ns {
 
                         if (left > 0)
                             throw new ApplicationException(
-                                $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left, 0x{BaseStream.Position:X} end position");
+                                $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left");
                         return target;
                     }
 
@@ -634,7 +636,7 @@ namespace Ns {
 
                     if (left > 0)
                         throw new ApplicationException(
-                            $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left, 0x{BaseStream.Position:X} end position");
+                            $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left");
                     return target;
                 }
             }
@@ -668,7 +670,7 @@ namespace Ns {
 
                 if (left > 0)
                     throw new ApplicationException(
-                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left, 0x{BaseStream.Position:X} end position");
+                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left");
 
                 if (order != 1 && enableSwap && Swap)
                     fixed (byte* p = &mainTarget.GetPinnableReference()) {
@@ -806,7 +808,7 @@ namespace Ns {
                 var read = BaseStream.Read(_buffer, tot, length - tot);
                 if (read == 0)
                     throw new ApplicationException(
-                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{length - tot:X} left, 0x{BaseStream.Position:X} end position");
+                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{length - tot:X} left");
                 tot += read;
             } while (tot < length);
 
@@ -842,7 +844,7 @@ namespace Ns {
 
                         if (len > 0)
                             throw new ApplicationException(
-                                $"Failed to read required number of bytes! 0x{tot:X} read, 0x{tot:X} left, 0x{BaseStream.Position:X} end position");
+                                $"Failed to read required number of bytes! 0x{tot:X} read, 0x{tot:X} left");
                     }
                 }
 
