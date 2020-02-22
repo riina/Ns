@@ -232,6 +232,7 @@ namespace Ns {
         ///     Converters specific to this serializer
         /// </summary>
         // ReSharper disable once UnusedAutoPropertyAccessor.Global
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
         public IReadOnlyDictionary<Type, (object encoder, object decoder)> CustomConverters { get; set; }
 
         private Decoder Decoder => _decoder ??= Encoding.UTF8.GetDecoder();
@@ -392,10 +393,10 @@ namespace Ns {
         /// <exception cref="ApplicationException">If unregistered types are used</exception>
         public static void AddDictionaryCustom<TKey, TValue>(
             Dictionary<Type, (object encoder, object decoder)> converters) {
-            if (!GetConverterCustom<TKey>(converters, out var key))
+            if (!GetConverterCustom<TKey>(converters, out var key, true))
                 throw new ApplicationException(
                     "Cannot add dictionary converters if dictionary key type is not already registered");
-            if (!GetConverterCustom<TValue>(converters, out var value))
+            if (!GetConverterCustom<TValue>(converters, out var value, true))
                 throw new ApplicationException(
                     "Cannot add dictionary converters if dictionary value type is not already registered");
             var (keyE, keyD) = key;
@@ -423,13 +424,14 @@ namespace Ns {
         /// </summary>
         /// <param name="converters">Custom converter mapping</param>
         /// <param name="res">Encoder and decoder</param>
+        /// <param name="withGlobal">Enable global converters</param>
         /// <typeparam name="T">Type to retrieve encoder/decoder for</typeparam>
         /// <returns>True if encoder/decoder were obtained</returns>
         public static bool GetConverterCustom<T>(IReadOnlyDictionary<Type, (object encoder, object decoder)> converters,
-            out (Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) res) {
+            out (Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) res, bool withGlobal = false) {
             res = default;
             if (!converters.TryGetValue(typeof(T), out var resX))
-                return false;
+                return withGlobal && GetConverter(out res);
             if (!(resX.encoder is Action<NetSerializer, T> encoder)) return false;
             if (!(resX.decoder is Func<NetSerializer, T> decoder)) return false;
             res = (encoder, decoder);
