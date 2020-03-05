@@ -16,7 +16,10 @@ namespace Ns {
     [SuppressMessage("ReSharper", "UnusedMember.Global")]
     [SuppressMessage("ReSharper", "UnusedMethodReturnValue.Global")]
     public class NetSerializer {
-        private static readonly bool Swap = BitConverter.IsLittleEndian;
+        private static readonly bool Swap = !BitConverter.IsLittleEndian;
+
+        private static readonly Dictionary<Type, (object encoder, object decoder)> Converters =
+            new Dictionary<Type, (object encoder, object decoder)>();
 
         private readonly byte[] _buffer = new byte[sizeof(decimal)];
         private Decoder _decoder;
@@ -217,7 +220,8 @@ namespace Ns {
         /// </summary>
         /// <param name="baseStream">Stream to wrap</param>
         /// <param name="converters">Custom converters to use</param>
-        public NetSerializer(Stream baseStream, IReadOnlyDictionary<Type, (object encoder, object decoder)> converters = null) {
+        public NetSerializer(Stream baseStream,
+            IReadOnlyDictionary<Type, (object encoder, object decoder)> converters = null) {
             BaseStream = baseStream;
             CustomConverters = converters;
         }
@@ -240,8 +244,7 @@ namespace Ns {
         private StringBuilder StringBuilder => _stringBuilder ??= new StringBuilder();
 
         private static void RegisterInternal<T>(Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) {
-            TypeConverter<T>.Converter = (encoder, decoder);
-            TypeConverter<T>.Init = true;
+            Converters[typeof(T)] = (encoder, decoder);
         }
 
         private static Action<NetSerializer, T[]> MakeNativeArrayEncoder<T>(bool enableSwap)
@@ -370,14 +373,16 @@ namespace Ns {
         /// <typeparam name="TValue">Dictionary value type</typeparam>
         /// <exception cref="ApplicationException">If unregistered types are used</exception>
         public static void AddDictionary<TKey, TValue>() {
-            if (!TypeConverter<TKey>.Init)
+            if (!Converters.TryGetValue(typeof(TKey), out var resKey))
                 throw new ApplicationException(
                     "Cannot add dictionary converters if dictionary key type is not already registered");
-            if (!TypeConverter<TValue>.Init)
+            if (!Converters.TryGetValue(typeof(TValue), out var resValue))
                 throw new ApplicationException(
                     "Cannot add dictionary converters if dictionary value type is not already registered");
-            var (keyE, keyD) = TypeConverter<TKey>.Converter;
-            var (valueE, valueD) = TypeConverter<TValue>.Converter;
+            var (keyE, keyD) = ((Action<NetSerializer, TKey>) resKey.encoder,
+                (Func<NetSerializer, TKey>) resKey.decoder);
+            var (valueE, valueD) = ((Action<NetSerializer, TValue>) resValue.encoder,
+                (Func<NetSerializer, TValue>) resValue.decoder);
             var ncKey = !typeof(TKey).IsValueType;
             var ncValue = !typeof(TValue).IsValueType;
             RegisterInternal(MakeDictionaryEncoder(keyE, ncKey, valueE, ncValue),
@@ -415,8 +420,13 @@ namespace Ns {
         /// <returns>True if encoder/decoder were obtained</returns>
         public static bool GetConverter<T>(
             out (Action<NetSerializer, T> encoder, Func<NetSerializer, T> decoder) res) {
-            res = TypeConverter<T>.Converter;
-            return TypeConverter<T>.Init;
+            if (Converters.TryGetValue(typeof(T), out var res1)) {
+                res = ((Action<NetSerializer, T>) res1.encoder, (Func<NetSerializer, T>) res1.decoder);
+                return true;
+            }
+
+            res = default;
+            return false;
         }
 
         /// <summary>
@@ -565,6 +575,9 @@ namespace Ns {
                     if (order == 1 || !enableSwap || !Swap) {
                         do {
                             read = BaseStream.Read(buf, curTot, Math.Min(4096 - curTot, left));
+                            if (read == 0)
+                                throw new ApplicationException(
+                                    $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left");
                             curTot += read;
                             var trunc = curTot - curTot % order;
                             for (var i = 0; i < trunc; i += order)
@@ -583,6 +596,9 @@ namespace Ns {
 
                     do {
                         read = BaseStream.Read(buf, curTot, Math.Min(4096 - curTot, left));
+                        if (read == 0)
+                            throw new ApplicationException(
+                                $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left");
                         curTot += read;
                         var trunc = curTot - curTot % order;
                         switch (order) {
@@ -665,6 +681,9 @@ namespace Ns {
                 int left = mainLen, tot = 0;
                 do {
                     var read = BaseStream.Read(buf, 0, Math.Min(4096, left));
+                    if (read == 0)
+                        throw new ApplicationException(
+                            $"Failed to read required number of bytes! 0x{tot:X} read, 0x{left:X} left");
                     span.Slice(0, read).CopyTo(mainTarget.Slice(tot));
                     left -= read;
                     tot += read;
@@ -832,6 +851,9 @@ namespace Ns {
                         int read, tot = 0;
                         do {
                             read = BaseStream.Read(tmpBuf, 0, Math.Min(len, 2048));
+                            if (read == 0)
+                                throw new ApplicationException(
+                                    $"Failed to read required number of bytes! 0x{tot:X} read, 0x{len:X} left");
                             len -= read;
                             var cur = 0;
                             do {
@@ -842,11 +864,7 @@ namespace Ns {
                             } while (cur != read);
 
                             tot += read;
-                        } while (len > 0 && read != 0);
-
-                        if (len > 0)
-                            throw new ApplicationException(
-                                $"Failed to read required number of bytes! 0x{tot:X} read, 0x{tot:X} left");
+                        } while (len > 0);
                     }
                 }
 
@@ -1263,16 +1281,6 @@ namespace Ns {
         public void WriteGuid(Guid value) {
             MemoryMarshal.Write(_buffer, ref value);
             BaseStream.Write(_buffer, 0, 16);
-        }
-
-        [SuppressMessage("ReSharper", "StaticMemberInGenericType")]
-        private static class TypeConverter<T> {
-            public static (Action<NetSerializer, T>encoder, Func<NetSerializer, T> decoder) Converter;
-            public static bool Init;
-
-            static TypeConverter() {
-                RuntimeHelpers.RunClassConstructor(typeof(T).TypeHandle);
-            }
         }
     }
 }
