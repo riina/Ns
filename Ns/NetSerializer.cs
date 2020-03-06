@@ -563,6 +563,8 @@ namespace Ns {
         /// <exception cref="ApplicationException">If failed to read required number of bytes</exception>
         public unsafe List<T> ReadList<T>(int count, bool enableSwap, List<T> target = null) where T : unmanaged {
             target ??= new List<T>();
+            if (count == 0)
+                return target;
             if (target.Capacity < count)
                 target.Capacity = count;
             var order = sizeof(T);
@@ -672,6 +674,7 @@ namespace Ns {
         /// <typeparam name="T">Type of elements</typeparam>
         /// <exception cref="ApplicationException">If failed to read required number of bytes</exception>
         public unsafe void ReadSpan<T>(Span<T> target, int count, bool enableSwap) where T : unmanaged {
+            if (count == 0) return;
             var mainTarget = MemoryMarshal.Cast<T, byte>(target);
             var order = sizeof(T);
             var mainLen = count * order;
