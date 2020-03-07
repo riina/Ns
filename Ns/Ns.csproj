@@ -8,8 +8,8 @@
         <Description>Minimally reflecting serialiazation library</Description>
         <Copyright>Copyright ©2020 teamRokuro</Copyright>
         <Company>teamRokuro</Company>
-        <AssemblyVersion>2.0.1</AssemblyVersion>
-        <PackageVersion>2.0.1</PackageVersion>
+        <AssemblyVersion>2.0.2</AssemblyVersion>
+        <PackageVersion>2.0.2</PackageVersion>
         <PackOnBuild>true</PackOnBuild>
         <Owners>riina</Owners>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>

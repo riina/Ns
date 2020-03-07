@@ -751,6 +751,8 @@ namespace Ns {
         /// <param name="enableSwap">Enable element endianness swapping</param>
         /// <typeparam name="T">Type of elements</typeparam>
         public unsafe void WriteSpan<T>(Span<T> source, int count, bool enableSwap) where T : unmanaged {
+            if (count == 0)
+                return;
             var mainTarget = MemoryMarshal.Cast<T, byte>(source);
             var buf = Shared.Rent(4096);
             var span = buf.AsSpan();
@@ -826,15 +828,57 @@ namespace Ns {
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Span<byte> ReadBase(int length) {
+        private Span<byte> ReadBase16() {
             var tot = 0;
             do {
-                var read = BaseStream.Read(_buffer, tot, length - tot);
+                var read = BaseStream.Read(_buffer, tot, sizeof(ushort) - tot);
                 if (read == 0)
                     throw new ApplicationException(
-                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{length - tot:X} left");
+                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{sizeof(ushort) - tot:X} left");
                 tot += read;
-            } while (tot < length);
+            } while (tot < sizeof(ushort));
+
+            return _buffer;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Span<byte> ReadBase32() {
+            var tot = 0;
+            do {
+                var read = BaseStream.Read(_buffer, tot, sizeof(uint) - tot);
+                if (read == 0)
+                    throw new ApplicationException(
+                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{sizeof(uint) - tot:X} left");
+                tot += read;
+            } while (tot < sizeof(uint));
+
+            return _buffer;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Span<byte> ReadBase64() {
+            var tot = 0;
+            do {
+                var read = BaseStream.Read(_buffer, tot, sizeof(ulong) - tot);
+                if (read == 0)
+                    throw new ApplicationException(
+                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{sizeof(ulong) - tot:X} left");
+                tot += read;
+            } while (tot < sizeof(ulong));
+
+            return _buffer;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Span<byte> ReadBase128() {
+            var tot = 0;
+            do {
+                var read = BaseStream.Read(_buffer, tot, sizeof(decimal) - tot);
+                if (read == 0)
+                    throw new ApplicationException(
+                        $"Failed to read required number of bytes! 0x{tot:X} read, 0x{sizeof(decimal) - tot:X} left");
+                tot += read;
+            } while (tot < sizeof(decimal));
 
             return _buffer;
         }
@@ -851,9 +895,9 @@ namespace Ns {
                     var charPtr = (char*) (tmpBufPtr + 2048);
                     int len;
                     while ((len = Read7S32(out _)) != 0) {
-                        int read, tot = 0;
+                        int tot = 0;
                         do {
-                            read = BaseStream.Read(tmpBuf, 0, Math.Min(len, 2048));
+                            var read = BaseStream.Read(tmpBuf, 0, Math.Min(len, 2048));
                             if (read == 0)
                                 throw new ApplicationException(
                                     $"Failed to read required number of bytes! 0x{tot:X} read, 0x{len:X} left");
@@ -919,14 +963,12 @@ namespace Ns {
         public int Read7S32(out int len) {
             len = 1;
             var bits = 6;
-            var flag = false;
             var c = BaseStream.Read(_buffer, 0, 1);
             if (c == 0)
                 throw new EndOfStreamException();
             var v = _buffer[0];
             var value = v & 0x3f;
-            if ((v & 0x40) != 0)
-                flag = true;
+            var flag = (v & 0x40) != 0;
             if (v <= 0x7f)
                 while (bits < sizeof(int) * 8) {
                     var c2 = BaseStream.Read(_buffer, 0, 1);
@@ -989,14 +1031,12 @@ namespace Ns {
         public long Read7S64(out int len) {
             len = 1;
             var bits = 6;
-            var flag = false;
             var c = BaseStream.Read(_buffer, 0, 1);
             if (c == 0)
                 throw new EndOfStreamException();
             var v = _buffer[0];
             long value = v & 0x3f;
-            if ((v & 0x40) != 0)
-                flag = true;
+            var flag = (v & 0x40) != 0;
             if (v <= 0x7f)
                 while (bits < sizeof(long) * 8) {
                     var c2 = BaseStream.Read(_buffer, 0, 1);
@@ -1054,10 +1094,11 @@ namespace Ns {
         ///     Read signed 8-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public sbyte ReadS8() {
-            ReadBase(sizeof(byte));
-            return (sbyte) _buffer[0];
-        }
+        public sbyte ReadS8() =>
+            BaseStream.Read(_buffer, 0, 1) == 0
+                ? throw new ApplicationException(
+                    "Failed to read required number of bytes! 0x0 read, 0x1 left")
+                : (sbyte) _buffer[0];
 
         /// <summary>
         ///     Write signed 8-byte value
@@ -1072,10 +1113,11 @@ namespace Ns {
         ///     Read unsigned 8-byte value
         /// </summary>
         /// <returns>Value</returns>
-        public byte ReadU8() {
-            ReadBase(sizeof(byte));
-            return _buffer[0];
-        }
+        public byte ReadU8() =>
+            BaseStream.Read(_buffer, 0, 1) == 0
+                ? throw new ApplicationException(
+                    "Failed to read required number of bytes! 0x0 read, 0x1 left")
+                : _buffer[0];
 
         /// <summary>
         ///     Write unsigned 8-byte value
@@ -1093,8 +1135,8 @@ namespace Ns {
         public short ReadS16() {
             return Swap
                 ? ReverseEndianness(
-                    MemoryMarshal.Read<short>(ReadBase(sizeof(short))))
-                : MemoryMarshal.Read<short>(ReadBase(sizeof(short)));
+                    MemoryMarshal.Read<short>(ReadBase16()))
+                : MemoryMarshal.Read<short>(ReadBase16());
         }
 
         /// <summary>
@@ -1115,8 +1157,8 @@ namespace Ns {
         public ushort ReadU16() {
             return Swap
                 ? ReverseEndianness(
-                    MemoryMarshal.Read<ushort>(ReadBase(sizeof(ushort))))
-                : MemoryMarshal.Read<ushort>(ReadBase(sizeof(ushort)));
+                    MemoryMarshal.Read<ushort>(ReadBase16()))
+                : MemoryMarshal.Read<ushort>(ReadBase16());
         }
 
         /// <summary>
@@ -1137,8 +1179,8 @@ namespace Ns {
         public int ReadS32() {
             return Swap
                 ? ReverseEndianness(
-                    MemoryMarshal.Read<int>(ReadBase(sizeof(int))))
-                : MemoryMarshal.Read<int>(ReadBase(sizeof(int)));
+                    MemoryMarshal.Read<int>(ReadBase32()))
+                : MemoryMarshal.Read<int>(ReadBase32());
         }
 
         /// <summary>
@@ -1159,8 +1201,8 @@ namespace Ns {
         public uint ReadU32() {
             return Swap
                 ? ReverseEndianness(
-                    MemoryMarshal.Read<uint>(ReadBase(sizeof(uint))))
-                : MemoryMarshal.Read<uint>(ReadBase(sizeof(uint)));
+                    MemoryMarshal.Read<uint>(ReadBase32()))
+                : MemoryMarshal.Read<uint>(ReadBase32());
         }
 
         /// <summary>
@@ -1181,8 +1223,8 @@ namespace Ns {
         public long ReadS64() {
             return Swap
                 ? ReverseEndianness(
-                    MemoryMarshal.Read<long>(ReadBase(sizeof(long))))
-                : MemoryMarshal.Read<long>(ReadBase(sizeof(long)));
+                    MemoryMarshal.Read<long>(ReadBase64()))
+                : MemoryMarshal.Read<long>(ReadBase64());
         }
 
         /// <summary>
@@ -1203,8 +1245,8 @@ namespace Ns {
         public ulong ReadU64() {
             return Swap
                 ? ReverseEndianness(
-                    MemoryMarshal.Read<ulong>(ReadBase(sizeof(ulong))))
-                : MemoryMarshal.Read<ulong>(ReadBase(sizeof(ulong)));
+                    MemoryMarshal.Read<ulong>(ReadBase64()))
+                : MemoryMarshal.Read<ulong>(ReadBase64());
         }
 
         /// <summary>
@@ -1223,7 +1265,7 @@ namespace Ns {
         /// </summary>
         /// <returns>Value</returns>
         public float ReadSingle() {
-            return MemoryMarshal.Read<float>(ReadBase(sizeof(float)));
+            return MemoryMarshal.Read<float>(ReadBase32());
         }
 
         /// <summary>
@@ -1240,7 +1282,7 @@ namespace Ns {
         /// </summary>
         /// <returns>Value</returns>
         public double ReadDouble() {
-            return MemoryMarshal.Read<double>(ReadBase(sizeof(double)));
+            return MemoryMarshal.Read<double>(ReadBase32());
         }
 
         /// <summary>
@@ -1257,7 +1299,7 @@ namespace Ns {
         /// </summary>
         /// <returns>Value</returns>
         public decimal ReadDecimal() {
-            return MemoryMarshal.Read<decimal>(ReadBase(sizeof(decimal)));
+            return MemoryMarshal.Read<decimal>(ReadBase128());
         }
 
         /// <summary>
@@ -1274,7 +1316,7 @@ namespace Ns {
         /// </summary>
         /// <returns>Value</returns>
         public Guid ReadGuid() {
-            return MemoryMarshal.Read<Guid>(ReadBase(16));
+            return MemoryMarshal.Read<Guid>(ReadBase128());
         }
 
         /// <summary>
