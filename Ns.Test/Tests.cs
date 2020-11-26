@@ -5,14 +5,18 @@ using System.Runtime.InteropServices;
 using System.Text;
 using NUnit.Framework;
 
-namespace Ns.Test {
-    public class Tests {
+namespace Ns.Test
+{
+    public class Tests
+    {
         [SetUp]
-        public void Setup() {
+        public void Setup()
+        {
         }
 
         [Test]
-        public void TestBasicSequence() {
+        public void TestBasicSequence()
+        {
             const long l = 100L;
             const char c = 'x';
             var arr = new[] {0, 1, 2, 3, 4, 5};
@@ -29,21 +33,11 @@ namespace Ns.Test {
             var strLong = b.ToString();
             Assert.IsTrue(strLong.Length >= 4096 * 4);
             const decimal num = 1.05m;
-            var dict = new Dictionary<string, string> {
-                {"halo", "reach"},
-                {"tron", "evolution"},
-                {"portal", "2"},
-                {"xbox", "360"}
+            var dict = new Dictionary<string, string>
+            {
+                {"halo", "reach"}, {"tron", "evolution"}, {"portal", "2"}, {"xbox", "360"}
             };
-            var strArr = new[] {
-                "sounds",
-                "like",
-                "there's",
-                "a",
-                "lot",
-                "of",
-                "hoopla"
-            };
+            var strArr = new[] {"sounds", "like", "there's", "a", "lot", "of", "hoopla"};
             var guid = Guid.NewGuid();
             var ms = new MemoryStream();
             var ns = new NetSerializer(ms);
@@ -62,14 +56,15 @@ namespace Ns.Test {
             var l2 = ns.Deserialize<long>();
             var c2 = ns.Deserialize<char>();
             var arr2 = ns.Deserialize<int[]>();
-            var list2 = ns.Deserialize(true, s => {
-                var count = s.ReadS32();
+            var list2 = ns.Deserialize(true, (s, stream) =>
+            {
+                var count = stream.ReadS32();
                 var res = new List<int> {Capacity = count};
-                for (var i = 0; i < count; i++) res.Add(s.ReadS32());
+                for (var i = 0; i < count; i++) res.Add(stream.ReadS32());
 
                 return res;
             });
-            var listB2 = ns.Deserialize(true, s => s.ReadList<int>(s.ReadS32(), true));
+            var listB2 = ns.Deserialize(true, (s, stream) => stream.ReadList<int>(stream.ReadS32(), true));
             var str2 = ns.Deserialize<string>();
             var num2 = ns.Deserialize<decimal>();
             var dict2 = ns.Deserialize<Dictionary<string, string>>();
